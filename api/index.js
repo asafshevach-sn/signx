@@ -242,12 +242,32 @@ app.post('/api/templates/:id/use', errHandler(async (req, res) => {
 
 app.post('/api/embed/editor', errHandler(async (req, res) => {
   const { documentId, linkExpiration, redirectUri } = req.body;
-  res.json(await createEmbeddedEditorAPI(documentId, { linkExpiration, redirectUri }));
+  try {
+    res.json(await createEmbeddedEditorAPI(documentId, { linkExpiration, redirectUri }));
+  } catch (e) {
+    // If embedded editor is not available (404/403), return a direct SignNow link
+    const status = e.response?.status;
+    if (status === 404 || status === 403) {
+      console.log(`[embed/editor] Embedded editor not available (${status}), returning direct link`);
+      res.json({ url: null, directUrl: `https://app.signnow.com/webapp/document/${documentId}`, fallback: true });
+    } else {
+      throw e;
+    }
+  }
 }));
 
 app.post('/api/embed/sending', errHandler(async (req, res) => {
   const { documentId, type, linkExpiration, redirectUri } = req.body;
-  res.json(await createEmbeddedSendingAPI(documentId, { type, linkExpiration, redirectUri }));
+  try {
+    res.json(await createEmbeddedSendingAPI(documentId, { type, linkExpiration, redirectUri }));
+  } catch (e) {
+    const status = e.response?.status;
+    if (status === 404 || status === 403) {
+      res.json({ url: null, directUrl: `https://app.signnow.com/webapp/document/${documentId}`, fallback: true });
+    } else {
+      throw e;
+    }
+  }
 }));
 
 app.post('/api/invites/send', errHandler(async (req, res) => {

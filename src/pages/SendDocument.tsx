@@ -139,6 +139,7 @@ function UploadStep({ onUploaded }: { onUploaded: (doc: any) => void }) {
 // ─── Step 2: Add Fields (Embedded Editor + AI) ───────────────────────────────
 function FieldsStep({ document, onNext, onBack }: { document: any; onNext: (fields: any[]) => void; onBack: () => void }) {
   const [editorUrl, setEditorUrl] = useState<string | null>(null)
+  const [directUrl, setDirectUrl] = useState<string | null>(null)  // fallback: open in SignNow tab
   const [loadingEditor, setLoadingEditor] = useState(false)
   const [aiFields, setAiFields] = useState<any[]>([])
   const [detecting, setDetecting] = useState(false)
@@ -163,23 +164,27 @@ function FieldsStep({ document, onNext, onBack }: { document: any; onNext: (fiel
     setLoadingEditor(true)
     try {
       const result = await createEmbeddedEditor(document.id, { linkExpiration: 90 })
-      setEditorUrl(result.url)
+      if (result.url) {
+        setEditorUrl(result.url)
+      } else if ((result as any).directUrl) {
+        // Embedded editor not available on this plan — use direct link
+        setDirectUrl((result as any).directUrl)
+      }
     } catch (e: any) {
-      const detail = e.response?.data?.detail
       const msg = e.response?.data?.error || e.response?.data?.message || e.message || 'Could not open editor'
       console.error('[editor error]', e.response?.status, e.response?.data)
-      toast.error(detail ? `${msg}: ${JSON.stringify(detail).slice(0, 120)}` : msg, { duration: 8000 })
+      toast.error(msg, { duration: 6000 })
     } finally {
       setLoadingEditor(false)
     }
   }
 
   const FIELD_ICONS: Record<string, string> = {
-    signature: '\u270d\ufe0f', initials: '\ud83d\udd24', date: '\ud83d\udcc5',
-    text: '\ud83d\udcdd', checkbox: '\u2611\ufe0f',
+    signature: '✍️', initials: '🔤', date: '📅',
+    text: '📝', checkbox: '☑️',
   }
 
-  // Full-screen editor mode
+  // Full-screen embedded editor mode
   if (editorUrl) {
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col" style={{ height: 'calc(100vh - 160px)' }}>
@@ -204,6 +209,90 @@ function FieldsStep({ document, onNext, onBack }: { document: any; onNext: (fiel
     )
   }
 
+  // Determine the editor CTA card
+  const renderEditorCard = () => {
+    if (editorDone) {
+      return (
+        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+          className="flex flex-col items-center justify-center py-16 rounded-2xl gap-4 card"
+          style={{ borderColor: 'rgba(16,185,129,0.25)', background: 'rgba(16,185,129,0.04)' }}>
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.15)' }}>
+            <CheckCircle2 size={32} className="text-emerald-400" />
+          </div>
+          <div className="text-center">
+            <div className="text-white font-semibold text-lg">Fields configured!</div>
+            <div className="text-sm text-slate-400 mt-1">Your document is ready to send for signing</div>
+          </div>
+          <button onClick={openEditor} disabled={loadingEditor}
+            className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">
+            <PenLine size={14} /> {loadingEditor ? 'Opening...' : 'Edit fields again'}
+          </button>
+        </motion.div>
+      )
+    }
+
+    if (directUrl) {
+      // Fallback: embedded editor not available — link to SignNow app
+      return (
+        <div className="flex flex-col items-center justify-center py-12 rounded-2xl gap-5 card"
+          style={{ borderColor: 'rgba(99,102,241,0.2)' }}>
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.12)' }}>
+            <PenLine size={28} className="text-brand-400" />
+          </div>
+          <div className="text-center px-4">
+            <div className="text-white font-semibold text-lg mb-2">Add fields in SignNow</div>
+            <div className="text-sm text-slate-400 max-w-xs leading-relaxed">
+              Your document has been uploaded. Open it in SignNow to drag & drop signature, date and text fields.
+            </div>
+          </div>
+          <div className="flex flex-col items-center gap-3 w-full px-6">
+            <a
+              href={directUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary flex items-center justify-center gap-2 px-6 w-full text-center"
+              onClick={() => { /* mark as done after opening */ setTimeout(() => setEditorDone(true), 3000) }}
+            >
+              <PenLine size={15} />
+              Open in SignNow ↗
+            </a>
+            <p className="text-xs text-slate-500 text-center">
+              After adding fields in SignNow, come back here and click Continue.
+            </p>
+            <button onClick={() => setEditorDone(true)}
+              className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1.5">
+              <CheckCircle2 size={14} /> I've added the fields, continue
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-center py-16 rounded-2xl gap-5 card"
+        style={{ borderColor: 'rgba(99,102,241,0.2)' }}>
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.12)' }}>
+          <PenLine size={28} className="text-brand-400" />
+        </div>
+        <div className="text-center">
+          <div className="text-white font-semibold text-lg mb-1">Open the Document Editor</div>
+          <div className="text-sm text-slate-400 max-w-xs leading-relaxed">
+            Visually drag & drop signature, date, and text fields onto your PDF. Changes are saved automatically in SignNow.
+          </div>
+        </div>
+        <div className="flex flex-col items-center gap-3">
+          <button onClick={openEditor} disabled={loadingEditor} className="btn-primary flex items-center gap-2 px-6">
+            {loadingEditor ? <Spinner size={15} /> : <PenLine size={15} />}
+            {loadingEditor ? 'Opening Editor...' : 'Open Editor'}
+          </button>
+          <button onClick={() => onNext(aiFields)} className="text-sm text-slate-500 hover:text-slate-300 transition-colors">
+            Skip — send without adding fields
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
       <h2 className="text-2xl font-display font-bold text-white mb-1">Add signature fields</h2>
@@ -214,45 +303,7 @@ function FieldsStep({ document, onNext, onBack }: { document: any; onNext: (fiel
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Left: editor CTA */}
         <div className="lg:col-span-3">
-          {editorDone ? (
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-              className="flex flex-col items-center justify-center py-16 rounded-2xl gap-4 card"
-              style={{ borderColor: 'rgba(16,185,129,0.25)', background: 'rgba(16,185,129,0.04)' }}>
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.15)' }}>
-                <CheckCircle2 size={32} className="text-emerald-400" />
-              </div>
-              <div className="text-center">
-                <div className="text-white font-semibold text-lg">Fields configured!</div>
-                <div className="text-sm text-slate-400 mt-1">Your document is ready to send for signing</div>
-              </div>
-              <button onClick={openEditor} disabled={loadingEditor}
-                className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">
-                <PenLine size={14} /> {loadingEditor ? 'Opening...' : 'Edit fields again'}
-              </button>
-            </motion.div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-16 rounded-2xl gap-5 card"
-              style={{ borderColor: 'rgba(99,102,241,0.2)' }}>
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.12)' }}>
-                <PenLine size={28} className="text-brand-400" />
-              </div>
-              <div className="text-center">
-                <div className="text-white font-semibold text-lg mb-1">Open the Document Editor</div>
-                <div className="text-sm text-slate-400 max-w-xs leading-relaxed">
-                  Visually drag & drop signature, date, and text fields onto your PDF. Changes are saved automatically in SignNow.
-                </div>
-              </div>
-              <div className="flex flex-col items-center gap-3">
-                <button onClick={openEditor} disabled={loadingEditor} className="btn-primary flex items-center gap-2 px-6">
-                  {loadingEditor ? <Spinner size={15} /> : <PenLine size={15} />}
-                  {loadingEditor ? 'Opening Editor...' : 'Open Editor'}
-                </button>
-                <button onClick={() => onNext(aiFields)} className="text-sm text-slate-500 hover:text-slate-300 transition-colors">
-                  Skip — send without adding fields
-                </button>
-              </div>
-            </div>
-          )}
+          {renderEditorCard()}
         </div>
 
         {/* Right: AI suggestions panel */}
