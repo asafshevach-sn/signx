@@ -201,6 +201,54 @@
   }
 }
 
+/* ─── Light mode: fix hardcoded Tailwind text colors ─────────────────────── */
+/*
+ * In dark mode we use text-white / text-slate-* everywhere.
+ * In light mode those colours are invisible or too faint — override them.
+ * We exclude .btn-primary / .btn-secondary so button labels stay correct.
+ */
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+/* Primary content text (titles, numbers, labels) */
+[data-theme="light"] .text-white:not(button):not(.btn-primary):not([class*="btn"]) {
+  color: #0f172a !important;
+}
+
+/* Secondary / subtext */
+[data-theme="light"] .text-slate-300 { color: #334155 !important; }
+[data-theme="light"] .text-slate-400 { color: #475569 !important; }
+[data-theme="light"] .text-slate-500 { color: #64748b !important; }
+[data-theme="light"] .text-slate-600 { color: #475569 !important; }
+
+/* Very faint helper lines */
+[data-theme="light"] .text-slate-700 { color: #94a3b8 !important; }
+
+/* Brand/accent keep their colours in both themes */
+/* (text-brand-*, text-emerald-*, text-rose-*, text-amber-* etc. are fine as-is) */
+
+/* Backgrounds that use rgba(255,255,255,0.0x) look invisible in light — boost them */
+[data-theme="light"] .bg-white\/3  { background-color: rgba(0,0,0,0.03) !important; }
+[data-theme="light"] .bg-white\/4  { background-color: rgba(0,0,0,0.04) !important; }
+[data-theme="light"] .bg-white\/5  { background-color: rgba(0,0,0,0.04) !important; }
+[data-theme="light"] .bg-white\/6  { background-color: rgba(0,0,0,0.05) !important; }
+[data-theme="light"] .bg-white\/8  { background-color: rgba(0,0,0,0.06) !important; }
+[data-theme="light"] .bg-white\/10 { background-color: rgba(0,0,0,0.07) !important; }
+[data-theme="light"] .bg-white\/12 { background-color: rgba(0,0,0,0.08) !important; }
+[data-theme="light"] .bg-white\/15 { background-color: rgba(0,0,0,0.08) !important; }
+
+/* Border overrides for near-invisible lines */
+[data-theme="light"] .border-white\/5  { border-color: rgba(0,0,0,0.06) !important; }
+[data-theme="light"] .border-white\/8  { border-color: rgba(0,0,0,0.08) !important; }
+[data-theme="light"] .border-white\/10 { border-color: rgba(0,0,0,0.09) !important; }
+[data-theme="light"] .border-white\/12 { border-color: rgba(0,0,0,0.10) !important; }
+[data-theme="light"] .border-white\/15 { border-color: rgba(0,0,0,0.11) !important; }
+[data-theme="light"] .border-white\/20 { border-color: rgba(0,0,0,0.13) !important; }
+
+/* Sidebar in light mode */
+[data-theme="light"] .text-slate-400.font-semibold { color: #374151 !important; }
+
 /* SignNow embedded iframe */
 iframe.sn-embedded {
   border: none;
