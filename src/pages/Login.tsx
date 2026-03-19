@@ -33,6 +33,7 @@ export function Login() {
         client_id: CLIENT_ID,
         callback: handleCredentialResponse,
         auto_select: false,
+        hl: 'en',
       })
       ;(window as any).google.accounts.id.renderButton(btnRef.current, {
         type: 'standard',
@@ -42,6 +43,7 @@ export function Login() {
         text: 'signin_with',
         shape: 'rectangular',
         logo_alignment: 'left',
+        locale: 'en',
       })
     }
 
