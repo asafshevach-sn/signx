@@ -255,12 +255,20 @@ app.post('/api/invites/:documentId/cancel', errHandler(async (req, res) => {
 }));
 
 // ─── AI Routes ───────────────────────────────────────────────────────────────
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// Lazy-init so a missing key doesn't crash the whole module at startup
+let _anthropic = null;
+function getAnthropic() {
+  if (!_anthropic) {
+    if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set in environment variables');
+    _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  }
+  return _anthropic;
+}
 
 app.post('/api/ai/summarize', errHandler(async (req, res) => {
   const { documentName, documentType, fields, roles, pageCount } = req.body;
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6', max_tokens: 300,
+  const message = await getAnthropic().messages.create({
+    model: 'claude-sonnet-4-5', max_tokens: 300,
     messages: [{ role: 'user', content: `You are a helpful document assistant. Summarize this document for a recipient who is about to sign it.\n\nDocument name: ${documentName}\nDocument type: ${documentType || 'Agreement'}\nPages: ${pageCount || 'Unknown'}\nSigners: ${(roles || []).join(', ')}\nFields: ${(fields || []).map(f => f.type).join(', ')}\n\nWrite a concise, friendly 3-4 sentence summary explaining what this document is, what the signer agrees to, key things to note, and what happens after signing. No bullet points.` }]
   });
   res.json({ summary: message.content[0].text });
@@ -268,8 +276,8 @@ app.post('/api/ai/summarize', errHandler(async (req, res) => {
 
 app.post('/api/ai/detect-fields', errHandler(async (req, res) => {
   const { documentName, documentType } = req.body;
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6', max_tokens: 500,
+  const message = await getAnthropic().messages.create({
+    model: 'claude-sonnet-4-5', max_tokens: 500,
     messages: [{ role: 'user', content: `For a document named "${documentName}" of type "${documentType || 'Agreement'}", suggest common signature fields. Return ONLY a JSON array:\n[{"type":"signature","label":"Signature","description":"Primary signature","page":1,"importance":"required"},{"type":"date","label":"Date","description":"Date of signing","page":1,"importance":"required"}]\nField types: signature, initials, date, text, checkbox. Importance: required, recommended, optional. Suggest 4-8 fields.` }]
   });
   const text = message.content[0].text;
@@ -279,8 +287,8 @@ app.post('/api/ai/detect-fields', errHandler(async (req, res) => {
 
 app.post('/api/ai/smart-subject', errHandler(async (req, res) => {
   const { documentName, recipientName } = req.body;
-  const message = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001', max_tokens: 80,
+  const message = await getAnthropic().messages.create({
+    model: 'claude-haiku-4-5', max_tokens: 80,
     messages: [{ role: 'user', content: `Write a professional email subject line for sending "${documentName}" to ${recipientName || 'a recipient'} for signing. Max 60 chars. Return only the subject, no quotes.` }]
   });
   res.json({ subject: message.content[0].text.trim() });

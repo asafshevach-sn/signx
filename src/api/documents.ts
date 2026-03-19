@@ -63,9 +63,8 @@ export async function getDocument(id: string) {
 export async function uploadDocument(file: File) {
   const form = new FormData()
   form.append('file', file)
-  const { data } = await client.post('/documents/upload', form, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  })
+  // Do NOT set Content-Type manually — axios must auto-set it with the multipart boundary
+  const { data } = await client.post('/documents/upload', form)
   return data
 }
 
