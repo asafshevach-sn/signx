@@ -1,30 +1,60 @@
-import { useEffect, useRef } from 'react'
-import { motion } from 'framer-motion'
+import { useEffect, useRef, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Zap, Sparkles, Shield, FileText, CheckCircle2,
-  PenLine, Clock, Users, ArrowRight, Star
+  Clock, Users, Eye, EyeOff, Mail, Lock, ArrowRight, Star
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import toast from 'react-hot-toast'
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string
 
-// ─── Floating activity cards ──────────────────────────────────────────────────
-const activities = [
-  { icon: <CheckCircle2 size={14} />, color: '#10b981', bg: '#d1fae5', name: 'Sarah K.', action: 'just signed', doc: 'NDA Agreement.pdf', time: '2m ago' },
-  { icon: <PenLine size={14} />,      color: '#6366f1', bg: '#e0e7ff', name: 'Michael R.', action: 'sent for signing', doc: 'Service Contract.pdf', time: '5m ago' },
-  { icon: <CheckCircle2 size={14} />, color: '#10b981', bg: '#d1fae5', name: 'Emily T.', action: 'completed', doc: 'Offer Letter.pdf', time: '12m ago' },
-  { icon: <Clock size={14} />,        color: '#f59e0b', bg: '#fef3c7', name: 'David L.', action: 'awaiting signature', doc: 'Partnership Agreement.pdf', time: '18m ago' },
+const valueProps = [
+  {
+    icon: FileText,
+    color: '#6366f1',
+    bg: '#eef2ff',
+    title: 'Send documents in minutes',
+    desc: 'Upload any PDF, add signature fields, and send to multiple recipients instantly.',
+  },
+  {
+    icon: Sparkles,
+    color: '#8b5cf6',
+    bg: '#f5f3ff',
+    title: 'AI that works for you',
+    desc: 'Auto-detects signature fields, summarizes documents for signers, and suggests smart email subjects.',
+  },
+  {
+    icon: Users,
+    color: '#0ea5e9',
+    bg: '#e0f2fe',
+    title: 'Flexible signing workflows',
+    desc: 'Sequential or parallel signing, custom roles, and real-time tracking for every recipient.',
+  },
+  {
+    icon: Shield,
+    color: '#10b981',
+    bg: '#d1fae5',
+    title: 'Legally binding & secure',
+    desc: 'Every signature is timestamped, audit-trailed, and fully compliant with eSignature laws.',
+  },
 ]
 
 const stats = [
-  { value: '98%', label: 'Completion rate', icon: <CheckCircle2 size={16} />, color: '#10b981' },
-  { value: '3 min', label: 'Avg. sign time', icon: <Clock size={16} />, color: '#6366f1' },
-  { value: '100%', label: 'Legally binding', icon: <Shield size={16} />, color: '#8b5cf6' },
+  { value: '98%', label: 'Completion rate', color: '#10b981' },
+  { value: '3 min', label: 'Avg. sign time', color: '#6366f1' },
+  { value: '256-bit', label: 'Encryption', color: '#8b5cf6' },
 ]
 
 export function Login() {
-  const { handleCredentialResponse } = useAuth()
+  const { handleCredentialResponse, signInWithEmail } = useAuth()
   const btnRef = useRef<HTMLDivElement>(null)
+
+  const [mode, setMode] = useState<'signin' | 'register'>('signin')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPass, setShowPass] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     const initGSI = () => {
@@ -56,29 +86,44 @@ export function Login() {
     document.head.appendChild(script)
   }, [handleCredentialResponse])
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email || !password) return
+    if (password.length < 6) { toast.error('Password must be at least 6 characters'); return }
+    setLoading(true)
+    try {
+      await signInWithEmail(email, password, mode === 'register')
+      toast.success(mode === 'register' ? 'Account created!' : 'Welcome back!')
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen flex" style={{ background: '#f8f7ff' }}>
 
       {/* ── Left panel ─────────────────────────────────────────────────────── */}
       <div className="hidden lg:flex flex-col justify-between w-[55%] p-12 relative overflow-hidden"
         style={{
-          background: 'linear-gradient(145deg, #eef2ff 0%, #f5f3ff 40%, #fdf4ff 100%)',
+          background: 'linear-gradient(145deg, #eef2ff 0%, #f5f3ff 45%, #fdf4ff 100%)',
           borderRight: '1px solid #e0e7ff',
         }}>
 
         {/* Background decoration */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-[-80px] left-[-80px] w-[400px] h-[400px] rounded-full opacity-30"
-            style={{ background: 'radial-gradient(circle, #c7d2fe, transparent 70%)' }} />
-          <div className="absolute bottom-[-60px] right-[-60px] w-[350px] h-[350px] rounded-full opacity-20"
-            style={{ background: 'radial-gradient(circle, #ddd6fe, transparent 70%)' }} />
-          <svg className="absolute top-0 left-0 w-full h-full opacity-[0.04]" xmlns="http://www.w3.org/2000/svg">
+          <div className="absolute top-[-100px] left-[-100px] w-[500px] h-[500px] rounded-full opacity-25"
+            style={{ background: 'radial-gradient(circle, #c7d2fe, transparent 65%)' }} />
+          <div className="absolute bottom-[-80px] right-[-80px] w-[400px] h-[400px] rounded-full opacity-20"
+            style={{ background: 'radial-gradient(circle, #ddd6fe, transparent 65%)' }} />
+          <svg className="absolute inset-0 w-full h-full opacity-[0.035]">
             <defs>
-              <pattern id="dots" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
+              <pattern id="grid" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
                 <circle cx="2" cy="2" r="1.5" fill="#6366f1" />
               </pattern>
             </defs>
-            <rect width="100%" height="100%" fill="url(#dots)" />
+            <rect width="100%" height="100%" fill="url(#grid)" />
           </svg>
         </div>
 
@@ -97,86 +142,58 @@ export function Login() {
           </div>
         </div>
 
-        {/* Hero */}
+        {/* Hero + value props */}
         <div className="relative">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-5"
               style={{ background: '#e0e7ff', color: '#4338ca' }}>
               <Sparkles size={12} />
               AI-Powered eSignature Platform
             </div>
-            <h1 className="text-4xl font-display font-bold leading-tight mb-4"
-              style={{ color: '#1e1b4b' }}>
-              The smarter way<br />
-              to get documents<br />
+            <h1 className="text-4xl font-display font-bold leading-tight mb-4" style={{ color: '#1e1b4b' }}>
+              The smarter way<br />to get documents<br />
               <span style={{
                 background: 'linear-gradient(135deg, #4f46e5, #7c3aed, #a855f7)',
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
               }}>signed</span>
             </h1>
-            <p className="text-base mb-8 leading-relaxed max-w-sm" style={{ color: '#6b7280' }}>
-              Upload, prepare, and send documents for signature in minutes.
-              AI detects fields, summarizes content, and guides every signer.
-            </p>
           </motion.div>
 
-          {/* Stats row */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
-            className="flex gap-4 mb-8"
-          >
-            {stats.map((s, i) => (
+          {/* Value props */}
+          <div className="space-y-3 mb-8">
+            {valueProps.map((vp, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.3 + i * 0.1 }}
-                className="flex-1 rounded-2xl p-3.5 text-center"
-                style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(99,102,241,0.12)', backdropFilter: 'blur(8px)' }}
+                initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 + i * 0.09 }}
+                className="flex items-start gap-4 rounded-2xl px-4 py-3.5"
+                style={{ background: 'rgba(255,255,255,0.65)', border: '1px solid rgba(99,102,241,0.1)', backdropFilter: 'blur(6px)' }}
               >
-                <div className="flex items-center justify-center gap-1.5 mb-1" style={{ color: s.color }}>
-                  {s.icon}
-                  <span className="text-lg font-display font-bold">{s.value}</span>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+                  style={{ background: vp.bg, color: vp.color }}>
+                  <vp.icon size={16} />
                 </div>
-                <div className="text-xs text-gray-500 font-medium">{s.label}</div>
+                <div>
+                  <div className="text-sm font-semibold mb-0.5" style={{ color: '#1e1b4b' }}>{vp.title}</div>
+                  <div className="text-xs leading-relaxed" style={{ color: '#6b7280' }}>{vp.desc}</div>
+                </div>
               </motion.div>
             ))}
-          </motion.div>
-
-          {/* Live activity feed */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Live Activity</span>
-            </div>
-            <div className="space-y-2">
-              {activities.slice(0, 3).map((a, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.5 + i * 0.1 }}
-                  className="flex items-center gap-3 rounded-xl px-4 py-3"
-                  style={{ background: 'rgba(255,255,255,0.75)', border: '1px solid rgba(99,102,241,0.1)', backdropFilter: 'blur(6px)' }}
-                >
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-                    style={{ background: a.bg, color: a.color }}>
-                    {a.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <span className="font-semibold text-gray-700">{a.name}</span>
-                      <span className="text-gray-400">{a.action}</span>
-                    </div>
-                    <div className="text-[11px] text-gray-400 truncate">{a.doc}</div>
-                  </div>
-                  <span className="text-[10px] font-medium text-gray-400 flex-shrink-0">{a.time}</span>
-                </motion.div>
-              ))}
-            </div>
           </div>
+
+          {/* Stats */}
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
+            className="flex gap-3"
+          >
+            {stats.map((s, i) => (
+              <div key={i} className="flex-1 rounded-xl px-3 py-2.5 text-center"
+                style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(99,102,241,0.1)' }}>
+                <div className="text-base font-display font-bold" style={{ color: s.color }}>{s.value}</div>
+                <div className="text-[11px] text-gray-500 mt-0.5">{s.label}</div>
+              </div>
+            ))}
+          </motion.div>
         </div>
 
         {/* Bottom */}
@@ -189,7 +206,7 @@ export function Login() {
             ))}
           </div>
           <div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5">
               {[...Array(5)].map((_, i) => <Star key={i} size={10} className="fill-amber-400 text-amber-400" />)}
             </div>
             <div className="text-[11px] text-gray-400 mt-0.5">Trusted by thousands of businesses</div>
@@ -198,7 +215,7 @@ export function Login() {
       </div>
 
       {/* ── Right panel ────────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col items-center justify-center p-8 relative overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-center p-8">
 
         {/* Mobile logo */}
         <div className="flex items-center gap-3 mb-10 lg:hidden">
@@ -217,8 +234,7 @@ export function Login() {
           transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 24 }}
           className="w-full max-w-[380px]"
         >
-          {/* Card */}
-          <div className="rounded-3xl p-8 relative"
+          <div className="rounded-3xl p-8"
             style={{
               background: '#ffffff',
               border: '1px solid #e0e7ff',
@@ -226,67 +242,99 @@ export function Login() {
             }}>
 
             {/* Header */}
-            <div className="text-center mb-8">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-md"
-                style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}>
-                <Zap size={26} className="text-white" />
+            <div className="text-center mb-7">
+              <div className="w-13 h-13 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-md"
+                style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', width: 52, height: 52 }}>
+                <Zap size={24} className="text-white" />
               </div>
-              <h1 className="text-2xl font-display font-bold mb-2" style={{ color: '#1e1b4b' }}>
-                Welcome back
+              <h1 className="text-2xl font-display font-bold mb-1.5" style={{ color: '#1e1b4b' }}>
+                {mode === 'signin' ? 'Welcome back' : 'Create account'}
               </h1>
               <p className="text-sm" style={{ color: '#9ca3af' }}>
-                Sign in to access your SignX workspace
+                {mode === 'signin' ? 'Sign in to your SignX workspace' : 'Start signing smarter today'}
               </p>
             </div>
 
-            {/* Google Button */}
-            <div className="flex justify-center mb-5">
-              <div ref={btnRef} />
-            </div>
-
-            {/* Divider */}
-            <div className="flex items-center gap-3 mb-5">
-              <div className="flex-1 h-px" style={{ background: '#f3f4f6' }} />
-              <span className="text-xs font-medium" style={{ color: '#d1d5db' }}>or</span>
-              <div className="flex-1 h-px" style={{ background: '#f3f4f6' }} />
-            </div>
-
-            {/* Feature pills */}
-            <div className="grid grid-cols-2 gap-2 mb-6">
-              {[
-                { icon: <FileText size={12} />, text: 'Upload PDFs' },
-                { icon: <PenLine size={12} />, text: 'Add fields' },
-                { icon: <Users size={12} />, text: 'Multiple signers' },
-                { icon: <Sparkles size={12} />, text: 'AI-powered' },
-              ].map((f, i) => (
-                <div key={i} className="flex items-center gap-2 rounded-xl px-3 py-2.5"
-                  style={{ background: '#f8f7ff', border: '1px solid #ede9fe' }}>
-                  <span style={{ color: '#6366f1' }}>{f.icon}</span>
-                  <span className="text-xs font-medium" style={{ color: '#4338ca' }}>{f.text}</span>
-                </div>
+            {/* Mode toggle */}
+            <div className="flex rounded-xl p-1 mb-6" style={{ background: '#f3f4f6' }}>
+              {(['signin', 'register'] as const).map(m => (
+                <button key={m} onClick={() => setMode(m)}
+                  className="flex-1 py-2 rounded-lg text-sm font-semibold transition-all"
+                  style={mode === m
+                    ? { background: '#fff', color: '#4338ca', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }
+                    : { color: '#9ca3af' }
+                  }>
+                  {m === 'signin' ? 'Sign in' : 'Create account'}
+                </button>
               ))}
             </div>
 
-            {/* CTA hint */}
-            <button className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
-              style={{
-                background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-                color: '#fff',
-                boxShadow: '0 4px 16px rgba(79,70,229,0.3)',
-              }}
-              onClick={() => btnRef.current?.querySelector('div')?.click()}>
-              Get started free
-              <ArrowRight size={15} />
-            </button>
+            {/* Email/password form */}
+            <form onSubmit={handleSubmit} className="space-y-3 mb-4">
+              <div className="relative">
+                <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#9ca3af' }} />
+                <input
+                  type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  placeholder="Email address" required
+                  className="w-full pl-10 pr-4 py-3 rounded-xl text-sm outline-none transition-all"
+                  style={{
+                    background: '#f9fafb', border: '1.5px solid #e5e7eb', color: '#1e1b4b',
+                  }}
+                  onFocus={e => e.currentTarget.style.borderColor = '#6366f1'}
+                  onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}
+                />
+              </div>
+              <div className="relative">
+                <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#9ca3af' }} />
+                <input
+                  type={showPass ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
+                  placeholder="Password" required minLength={6}
+                  className="w-full pl-10 pr-10 py-3 rounded-xl text-sm outline-none transition-all"
+                  style={{ background: '#f9fafb', border: '1.5px solid #e5e7eb', color: '#1e1b4b' }}
+                  onFocus={e => e.currentTarget.style.borderColor = '#6366f1'}
+                  onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}
+                />
+                <button type="button" onClick={() => setShowPass(p => !p)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: '#9ca3af' }}>
+                  {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+
+              <button type="submit" disabled={loading}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-60"
+                style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: '#fff', boxShadow: '0 4px 16px rgba(79,70,229,0.3)' }}>
+                {loading ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    {mode === 'signin' ? 'Sign in' : 'Create account'}
+                    <ArrowRight size={15} />
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-1 h-px" style={{ background: '#f3f4f6' }} />
+              <span className="text-xs font-medium" style={{ color: '#d1d5db' }}>or continue with</span>
+              <div className="flex-1 h-px" style={{ background: '#f3f4f6' }} />
+            </div>
+
+            {/* Google Button */}
+            <div className="flex justify-center">
+              <div ref={btnRef} />
+            </div>
           </div>
 
           {/* Trust badges */}
-          <div className="flex items-center justify-center gap-4 mt-6">
+          <div className="flex items-center justify-center gap-5 mt-5">
             {[
               { icon: <Shield size={12} />, label: 'Secure & encrypted' },
               { icon: <CheckCircle2 size={12} />, label: 'Legally binding' },
+              { icon: <Clock size={12} />, label: 'Sign in minutes' },
             ].map((b, i) => (
-              <div key={i} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: '#9ca3af' }}>
+              <div key={i} className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color: '#9ca3af' }}>
                 <span style={{ color: '#a5b4fc' }}>{b.icon}</span>
                 {b.label}
               </div>

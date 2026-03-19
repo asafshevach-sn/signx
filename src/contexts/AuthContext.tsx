@@ -12,6 +12,7 @@ interface AuthContextValue {
   loading: boolean
   signOut: () => void
   handleCredentialResponse: (response: { credential: string }) => void
+  signInWithEmail: (email: string, password: string, isRegister: boolean) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -19,9 +20,9 @@ const AuthContext = createContext<AuthContextValue>({
   loading: true,
   signOut: () => {},
   handleCredentialResponse: () => {},
+  signInWithEmail: async () => {},
 })
 
-// Decode JWT payload without verification (client-side only)
 function parseJwt(token: string): GoogleUser {
   const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
   const json = decodeURIComponent(
@@ -30,6 +31,17 @@ function parseJwt(token: string): GoogleUser {
     ).join('')
   )
   return JSON.parse(json) as GoogleUser
+}
+
+// Simple hash for storing password verification (client-side only)
+async function hashPassword(password: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password))
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+function nameFromEmail(email: string): string {
+  const local = email.split('@')[0]
+  return local.split(/[._-]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -50,15 +62,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('signx_user', JSON.stringify(parsed))
   }
 
+  const signInWithEmail = async (email: string, password: string, isRegister: boolean) => {
+    const hash = await hashPassword(password)
+    const usersKey = 'signx_users'
+    const users: Record<string, string> = JSON.parse(localStorage.getItem(usersKey) || '{}')
+
+    if (isRegister) {
+      if (users[email]) throw new Error('An account with this email already exists')
+      users[email] = hash
+      localStorage.setItem(usersKey, JSON.stringify(users))
+    } else {
+      if (!users[email]) throw new Error('No account found — please create one first')
+      if (users[email] !== hash) throw new Error('Incorrect password')
+    }
+
+    const profile: GoogleUser = {
+      name: nameFromEmail(email),
+      email,
+      picture: `https://ui-avatars.com/api/?name=${encodeURIComponent(nameFromEmail(email))}&background=6366f1&color=fff`,
+      sub: email,
+    }
+    setUser(profile)
+    localStorage.setItem('signx_user', JSON.stringify(profile))
+  }
+
   const signOut = () => {
     setUser(null)
     localStorage.removeItem('signx_user')
-    // Also revoke Google session
     ;(window as any).google?.accounts?.id?.disableAutoSelect()
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signOut, handleCredentialResponse }}>
+    <AuthContext.Provider value={{ user, loading, signOut, handleCredentialResponse, signInWithEmail }}>
       {children}
     </AuthContext.Provider>
   )
