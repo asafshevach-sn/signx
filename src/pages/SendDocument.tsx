@@ -165,7 +165,10 @@ function FieldsStep({ document, onNext, onBack }: { document: any; onNext: (fiel
       const result = await createEmbeddedEditor(document.id, { linkExpiration: 90 })
       setEditorUrl(result.url)
     } catch (e: any) {
-      toast.error(e.response?.data?.error || e.response?.data?.message || 'Could not open editor — check SignNow credentials')
+      const detail = e.response?.data?.detail
+      const msg = e.response?.data?.error || e.response?.data?.message || e.message || 'Could not open editor'
+      console.error('[editor error]', e.response?.status, e.response?.data)
+      toast.error(detail ? `${msg}: ${JSON.stringify(detail).slice(0, 120)}` : msg, { duration: 8000 })
     } finally {
       setLoadingEditor(false)
     }

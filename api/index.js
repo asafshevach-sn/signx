@@ -114,15 +114,24 @@ async function createFromTemplate(templateId, name) {
 async function createEmbeddedEditorAPI(documentId, options = {}) {
   const token = await getToken();
   const body = { link_expiration: options.linkExpiration || 90, ...(options.redirectUri ? { redirect_uri: options.redirectUri } : {}) };
+  console.log(`[embed/editor] POST /v2/documents/${documentId}/embedded/editor`, body);
   const res = await api(token).post(`/v2/documents/${documentId}/embedded/editor`, body);
-  return res.data;
+  console.log('[embed/editor] response:', JSON.stringify(res.data));
+  // SignNow returns { data: { url, expiration_time } } OR { url } depending on version
+  const url = res.data?.data?.url || res.data?.url || res.data?.link;
+  if (!url) throw new Error(`No URL in response: ${JSON.stringify(res.data)}`);
+  return { url };
 }
 
 async function createEmbeddedSendingAPI(documentId, options = {}) {
   const token = await getToken();
   const body = { link_expiration: options.linkExpiration || 30, type: options.type || 'manage', ...(options.redirectUri ? { redirect_uri: options.redirectUri } : {}) };
+  console.log(`[embed/sending] POST /v2/documents/${documentId}/embedded/sending`, body);
   const res = await api(token).post(`/v2/documents/${documentId}/embedded/sending`, body);
-  return res.data;
+  console.log('[embed/sending] response:', JSON.stringify(res.data));
+  const url = res.data?.data?.url || res.data?.url || res.data?.link;
+  if (!url) throw new Error(`No URL in response: ${JSON.stringify(res.data)}`);
+  return { url };
 }
 
 async function sendInviteAPI(documentId, recipients) {
