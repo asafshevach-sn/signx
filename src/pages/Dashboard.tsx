@@ -4,12 +4,118 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   FileText, CheckCircle2, Clock, AlertTriangle, TrendingUp,
   Upload, BookTemplate, Send, ArrowRight, Zap, Sparkles,
-  ChevronRight, Trophy, Star, Target, BarChart3, Users
+  ChevronRight, Trophy, Star, Target, BarChart3, Users, ChevronUp
 } from 'lucide-react'
 import { getStats, listDocuments, type Document } from '../api/documents'
 import { Badge } from '../components/ui/Badge'
 import { formatDistanceToNow } from 'date-fns'
 import { Spinner } from '../components/ui/Spinner'
+import { useAuth } from '../contexts/AuthContext'
+import { filterUserDocs } from '../hooks/useUserDocs'
+import {
+  getPoints, getLevelForPoints, getNextLevel, getLevelProgress,
+  LEVELS, type Level
+} from '../hooks/useAchievements'
+
+// ─── Level Badge (header widget) ──────────────────────────────────────────────
+function LevelWidget({ userId }: { userId: string }) {
+  const [pts, setPts] = useState(() => getPoints(userId))
+  const [showAll, setShowAll] = useState(false)
+
+  useEffect(() => {
+    const handler = (e: any) => { if (e.detail?.userId === userId) setPts(e.detail.total) }
+    window.addEventListener('signx:points', handler)
+    return () => window.removeEventListener('signx:points', handler)
+  }, [userId])
+
+  const level = getLevelForPoints(pts)
+  const next = getNextLevel(pts)
+  const pct = getLevelProgress(pts)
+
+  return (
+    <div className="relative">
+      <motion.button
+        whileHover={{ scale: 1.03 }}
+        whileTap={{ scale: 0.97 }}
+        onClick={() => setShowAll(v => !v)}
+        className="flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all"
+        style={{ background: 'rgba(251,191,36,0.08)', borderColor: 'rgba(251,191,36,0.2)' }}
+      >
+        <span className="text-xl leading-none">{level.emoji}</span>
+        <div className="text-left">
+          <div className="text-xs font-bold text-amber-300 leading-tight">Lvl {level.level} · {level.name}</div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <div className="w-20 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${pct}%` }}
+                transition={{ duration: 0.8, ease: 'easeOut' }}
+                className="h-full rounded-full bg-amber-400"
+              />
+            </div>
+            <span className="text-[10px] text-amber-500">{pts} pts</span>
+          </div>
+        </div>
+        <ChevronUp size={12} className={`text-amber-500 transition-transform ${showAll ? '' : 'rotate-180'}`} />
+      </motion.button>
+
+      <AnimatePresence>
+        {showAll && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.97 }}
+            transition={{ duration: 0.18 }}
+            className="absolute right-0 top-full mt-2 w-72 rounded-2xl shadow-2xl z-50 p-4"
+            style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)' }}
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <Star size={13} className="text-amber-400" />
+              <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>All Levels</span>
+            </div>
+            <div className="space-y-1 max-h-72 overflow-y-auto pr-1">
+              {LEVELS.map(lvl => {
+                const unlocked = pts >= lvl.minPoints
+                const isCurrent = lvl.level === level.level
+                return (
+                  <div key={lvl.level}
+                    className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-all ${
+                      isCurrent ? 'ring-1 ring-amber-400/40' : ''
+                    }`}
+                    style={isCurrent
+                      ? { background: 'rgba(251,191,36,0.12)' }
+                      : { opacity: unlocked ? 1 : 0.35 }
+                    }
+                  >
+                    <span className="text-base w-6 text-center">{lvl.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium truncate" style={{ color: unlocked ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                        {lvl.name}
+                      </div>
+                      <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                        {lvl.minPoints} pts
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-semibold" style={{ color: unlocked ? '#fbbf24' : 'var(--text-muted)' }}>
+                      Lvl {lvl.level}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+            {next && (
+              <div className="mt-3 pt-3 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+                <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  {next.minPoints - pts} pts to <strong className="text-amber-400">{next.emoji} {next.name}</strong>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 function StatCard({ icon, label, value, color, delta, onClick }: {
@@ -34,8 +140,8 @@ function StatCard({ icon, label, value, color, delta, onClick }: {
           </span>
         )}
       </div>
-      <div className="text-3xl font-bold font-display text-white mb-1">{value}</div>
-      <div className="text-sm text-slate-400">{label}</div>
+      <div className="text-3xl font-bold font-display" style={{ color: 'var(--text-primary)' }}>{value}</div>
+      <div className="text-sm" style={{ color: 'var(--text-muted)' }}>{label}</div>
     </motion.div>
   )
 }
@@ -47,7 +153,7 @@ interface Step {
   done?: boolean, points: number
 }
 
-function GettingStarted({ steps, totalDocs }: { steps: Step[], totalDocs: number }) {
+function GettingStarted({ steps }: { steps: Step[] }) {
   const completed = steps.filter(s => s.done).length
   const pct = Math.round((completed / steps.length) * 100)
   const navigate = useNavigate()
@@ -65,8 +171,8 @@ function GettingStarted({ steps, totalDocs }: { steps: Step[], totalDocs: number
             <Target size={16} className="text-brand-400" />
             <span className="text-xs font-semibold text-brand-400 uppercase tracking-wider">Getting Started</span>
           </div>
-          <h2 className="text-xl font-display font-bold text-white">Your signing journey</h2>
-          <p className="text-sm text-slate-400 mt-0.5">{completed} of {steps.length} steps complete · {pct}%</p>
+          <h2 className="text-xl font-display font-bold" style={{ color: 'var(--text-primary)' }}>Your signing journey</h2>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>{completed} of {steps.length} steps complete · {pct}%</p>
         </div>
         <div className="relative w-14 h-14 flex-shrink-0">
           <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
@@ -84,12 +190,11 @@ function GettingStarted({ steps, totalDocs }: { steps: Step[], totalDocs: number
             </defs>
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-xs font-bold text-white">{pct}%</span>
+            <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{pct}%</span>
           </div>
         </div>
       </div>
 
-      {/* Progress bar */}
       <div className="w-full h-1.5 rounded-full mb-5 overflow-hidden" style={{ background: 'var(--bg-skeleton-a)' }}>
         <motion.div
           initial={{ width: 0 }}
@@ -113,15 +218,14 @@ function GettingStarted({ steps, totalDocs }: { steps: Step[], totalDocs: number
             onClick={() => !step.done && navigate(step.actionTo)}
           >
             <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${
-              step.done
-                ? 'bg-emerald-500/20 text-emerald-400'
-                : 'bg-white/6 text-slate-400'
+              step.done ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/6 text-slate-400'
             }`}>
               {step.done ? <CheckCircle2 size={18} /> : step.icon}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className={`text-sm font-medium ${step.done ? 'line-through text-slate-500' : 'text-white'}`}>
+                <span className={`text-sm font-medium ${step.done ? 'line-through text-slate-500' : ''}`}
+                  style={step.done ? {} : { color: 'var(--text-primary)' }}>
                   {step.title}
                 </span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
@@ -129,7 +233,7 @@ function GettingStarted({ steps, totalDocs }: { steps: Step[], totalDocs: number
                   +{step.points} pts
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">{step.description}</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{step.description}</p>
             </div>
             {!step.done && (
               <div className="flex items-center gap-1.5 text-xs font-medium text-brand-400 flex-shrink-0">
@@ -160,8 +264,8 @@ function RecentDocCard({ doc }: { doc: Document }) {
         <FileText size={18} className="text-brand-400" />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-white truncate">{doc.name}</div>
-        <div className="text-xs text-slate-500 mt-0.5">
+        <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{doc.name}</div>
+        <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
           {formatDistanceToNow(doc.last_updated * 1000, { addSuffix: true })}
           {doc.invite?.participants?.length ? ` · ${doc.invite.participants.length} signer${doc.invite.participants.length > 1 ? 's' : ''}` : ''}
         </div>
@@ -174,12 +278,12 @@ function RecentDocCard({ doc }: { doc: Document }) {
   )
 }
 
-// ─── Activity Insight ─────────────────────────────────────────────────────────
+// ─── Activity Bar ─────────────────────────────────────────────────────────────
 function ActivityBar({ label, value, max, color }: { label: string, value: number, max: number, color: string }) {
   const pct = max > 0 ? (value / max) * 100 : 0
   return (
     <div className="flex items-center gap-3">
-      <div className="text-xs text-slate-400 w-24 truncate">{label}</div>
+      <div className="text-xs w-24 truncate" style={{ color: 'var(--text-muted)' }}>{label}</div>
       <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-skeleton-a)' }}>
         <motion.div
           initial={{ width: 0 }}
@@ -189,7 +293,7 @@ function ActivityBar({ label, value, max, color }: { label: string, value: numbe
           style={{ background: color }}
         />
       </div>
-      <div className="text-xs font-semibold text-white w-6 text-right">{value}</div>
+      <div className="text-xs font-semibold w-6 text-right" style={{ color: 'var(--text-primary)' }}>{value}</div>
     </div>
   )
 }
@@ -197,26 +301,38 @@ function ActivityBar({ label, value, max, color }: { label: string, value: numbe
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export function Dashboard() {
   const navigate = useNavigate()
-  const [stats, setStats] = useState<any>(null)
-  const [recentDocs, setRecentDocs] = useState<Document[]>([])
+  const { user } = useAuth()
+  const [allDocs, setAllDocs] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     try {
-      const [s, docsData] = await Promise.all([
-        getStats(),
-        listDocuments({ limit: 6, sortby: 'updated', order: 'desc' }),
-      ])
-      setStats(s)
-      setRecentDocs(docsData.document_groups || [])
+      const docsData = await listDocuments({ limit: 100, sortby: 'updated', order: 'desc' })
+      const raw = docsData.document_groups || []
+      // Filter to only this user's documents
+      const mine = user?.sub ? filterUserDocs(user.sub, raw) : raw
+      setAllDocs(mine)
     } catch (e) {
       console.error(e)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [user?.sub])
 
   useEffect(() => { load() }, [load])
+
+  // Compute stats from filtered docs
+  const stats = {
+    total: allDocs.length,
+    signed: allDocs.filter(d => d.invite?.status === 'completed').length,
+    waitingForOthers: allDocs.filter(d => d.invite?.status === 'pending' && !d.invite?.expired).length,
+    expired: allDocs.filter(d => d.invite?.expired === true).length,
+    drafts: allDocs.filter(d => !d.invite).length,
+  }
+
+  const recentDocs = allDocs.slice(0, 6)
+
+  const firstName = user?.name?.split(' ')[0] || 'there'
 
   const gettingStartedSteps: Step[] = [
     {
@@ -226,8 +342,8 @@ export function Dashboard() {
       icon: <Upload size={18} />,
       action: 'Upload',
       actionTo: '/send',
-      done: (stats?.total || 0) > 0,
-      points: 100,
+      done: stats.total > 0,
+      points: 5,
     },
     {
       id: 'send',
@@ -236,8 +352,8 @@ export function Dashboard() {
       icon: <Send size={18} />,
       action: 'Send',
       actionTo: '/send',
-      done: (stats?.waitingForOthers || 0) > 0 || (stats?.signed || 0) > 0,
-      points: 150,
+      done: stats.waitingForOthers > 0 || stats.signed > 0,
+      points: 10,
     },
     {
       id: 'template',
@@ -247,7 +363,7 @@ export function Dashboard() {
       action: 'Browse',
       actionTo: '/templates',
       done: false,
-      points: 75,
+      points: 15,
     },
     {
       id: 'signed',
@@ -256,12 +372,12 @@ export function Dashboard() {
       icon: <Trophy size={18} />,
       action: 'View',
       actionTo: '/documents',
-      done: (stats?.signed || 0) > 0,
-      points: 200,
+      done: stats.signed > 0,
+      points: 25,
     },
   ]
 
-  const maxStat = stats ? Math.max(stats.signed, stats.waitingForOthers, stats.expired, stats.drafts, 1) : 1
+  const maxStat = Math.max(stats.signed, stats.waitingForOthers, stats.expired, stats.drafts, 1)
 
   return (
     <div className="p-8">
@@ -269,16 +385,21 @@ export function Dashboard() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
+        className="flex items-start justify-between mb-8"
       >
-        <div className="flex items-center gap-2 mb-2">
-          <Sparkles size={16} className="text-brand-400" />
-          <span className="text-sm text-brand-400 font-medium">Good to see you</span>
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles size={16} className="text-brand-400" />
+            <span className="text-sm text-brand-400 font-medium">Good to see you</span>
+          </div>
+          <h1 className="text-3xl font-display font-bold" style={{ color: 'var(--text-primary)' }}>
+            Welcome back, <span className="gradient-text">{firstName}</span> 👋
+          </h1>
+          <p className="mt-1" style={{ color: 'var(--text-muted)' }}>Here's what's happening with your documents today.</p>
         </div>
-        <h1 className="text-3xl font-display font-bold text-white">
-          Welcome back, <span className="gradient-text">Asaf</span> 👋
-        </h1>
-        <p className="text-slate-400 mt-1">Here's what's happening with your documents today.</p>
+
+        {/* Level widget top-right */}
+        {user?.sub && <LevelWidget userId={user.sub} />}
       </motion.div>
 
       {loading ? (
@@ -294,55 +415,31 @@ export function Dashboard() {
             transition={{ delay: 0.05 }}
             className="grid grid-cols-2 lg:grid-cols-4 gap-4"
           >
-            <StatCard
-              icon={<FileText size={20} />}
-              label="Total Documents"
-              value={stats?.total ?? '—'}
-              color="#6366f1"
-              onClick={() => navigate('/documents')}
-            />
-            <StatCard
-              icon={<CheckCircle2 size={20} />}
-              label="Completed"
-              value={stats?.signed ?? '—'}
-              color="#10b981"
-              delta={stats?.signed > 0 ? `${stats.signed} signed` : undefined}
-              onClick={() => navigate('/documents?filter=signed')}
-            />
-            <StatCard
-              icon={<Clock size={20} />}
-              label="Waiting for Others"
-              value={stats?.waitingForOthers ?? '—'}
-              color="#f59e0b"
-              onClick={() => navigate('/documents?filter=pending')}
-            />
-            <StatCard
-              icon={<AlertTriangle size={20} />}
-              label="Expired"
-              value={stats?.expired ?? '—'}
-              color="#f43f5e"
-              onClick={() => navigate('/documents?filter=expired')}
-            />
+            <StatCard icon={<FileText size={20} />} label="Total Documents" value={stats.total}
+              color="#6366f1" onClick={() => navigate('/documents')} />
+            <StatCard icon={<CheckCircle2 size={20} />} label="Completed" value={stats.signed}
+              color="#10b981" delta={stats.signed > 0 ? `${stats.signed} signed` : undefined}
+              onClick={() => navigate('/documents?filter=signed')} />
+            <StatCard icon={<Clock size={20} />} label="Waiting for Others" value={stats.waitingForOthers}
+              color="#f59e0b" onClick={() => navigate('/documents?filter=pending')} />
+            <StatCard icon={<AlertTriangle size={20} />} label="Expired" value={stats.expired}
+              color="#f43f5e" onClick={() => navigate('/documents?filter=expired')} />
           </motion.div>
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             {/* Getting Started */}
             <div className="xl:col-span-2">
-              <GettingStarted steps={gettingStartedSteps} totalDocs={stats?.total || 0} />
+              <GettingStarted steps={gettingStartedSteps} />
             </div>
 
             {/* Right panel */}
             <div className="space-y-4">
               {/* Quick Actions */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="card"
-              >
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }} className="card">
                 <div className="flex items-center gap-2 mb-4">
                   <Zap size={15} className="text-amber-400" />
-                  <span className="text-sm font-semibold text-white">Quick Actions</span>
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Quick Actions</span>
                 </div>
                 <div className="space-y-2">
                   {[
@@ -350,12 +447,9 @@ export function Dashboard() {
                     { icon: <BookTemplate size={16} />, label: 'Use a Template', to: '/templates', color: '#8b5cf6' },
                     { icon: <FileText size={16} />, label: 'View All Docs', to: '/documents', color: '#06b6d4' },
                   ].map(a => (
-                    <motion.button
-                      key={a.to}
-                      whileHover={{ x: 3 }}
-                      onClick={() => navigate(a.to)}
-                      className="w-full flex items-center gap-3 p-2.5 rounded-lg text-sm text-slate-300 hover:text-white transition-all hover:bg-white/5"
-                    >
+                    <motion.button key={a.to} whileHover={{ x: 3 }} onClick={() => navigate(a.to)}
+                      className="w-full flex items-center gap-3 p-2.5 rounded-lg text-sm transition-all hover:bg-white/5"
+                      style={{ color: 'var(--text-secondary)' }}>
                       <span style={{ color: a.color }}>{a.icon}</span>
                       {a.label}
                       <ChevronRight size={13} className="ml-auto text-slate-600" />
@@ -365,51 +459,17 @@ export function Dashboard() {
               </motion.div>
 
               {/* Document Health */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="card"
-              >
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }} className="card">
                 <div className="flex items-center gap-2 mb-4">
                   <BarChart3 size={15} className="text-cyan-400" />
-                  <span className="text-sm font-semibold text-white">Document Health</span>
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Document Health</span>
                 </div>
                 <div className="space-y-3">
-                  <ActivityBar label="Completed" value={stats?.signed || 0} max={maxStat} color="#10b981" />
-                  <ActivityBar label="In Progress" value={stats?.waitingForOthers || 0} max={maxStat} color="#f59e0b" />
-                  <ActivityBar label="Drafts" value={stats?.drafts || 0} max={maxStat} color="#6366f1" />
-                  <ActivityBar label="Expired" value={stats?.expired || 0} max={maxStat} color="#f43f5e" />
-                </div>
-              </motion.div>
-
-              {/* Achievements */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-                className="card"
-                style={{ background: 'linear-gradient(135deg, rgba(251,191,36,0.06) 0%, rgba(245,158,11,0.04) 100%)', borderColor: 'rgba(251,191,36,0.12)' }}
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <Star size={15} className="text-amber-400" />
-                  <span className="text-sm font-semibold text-white">Achievements</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { emoji: '🚀', label: 'First Doc', done: (stats?.total || 0) > 0 },
-                    { emoji: '✍️', label: 'First Sign', done: (stats?.signed || 0) > 0 },
-                    { emoji: '🏆', label: 'Power User', done: (stats?.total || 0) >= 10 },
-                  ].map(a => (
-                    <div key={a.label}
-                      className={`flex flex-col items-center p-2 rounded-lg text-center transition-all ${
-                        a.done ? 'opacity-100' : 'opacity-30 grayscale'
-                      }`}
-                      style={a.done ? { background: 'rgba(251,191,36,0.1)' } : {}}>
-                      <span className="text-xl mb-1">{a.emoji}</span>
-                      <span className="text-[10px] text-slate-400">{a.label}</span>
-                    </div>
-                  ))}
+                  <ActivityBar label="Completed" value={stats.signed} max={maxStat} color="#10b981" />
+                  <ActivityBar label="In Progress" value={stats.waitingForOthers} max={maxStat} color="#f59e0b" />
+                  <ActivityBar label="Drafts" value={stats.drafts} max={maxStat} color="#6366f1" />
+                  <ActivityBar label="Expired" value={stats.expired} max={maxStat} color="#f43f5e" />
                 </div>
               </motion.div>
             </div>
@@ -417,28 +477,20 @@ export function Dashboard() {
 
           {/* Recent Documents */}
           {recentDocs.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="card"
-            >
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }} className="card">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Users size={15} className="text-slate-400" />
-                  <span className="text-sm font-semibold text-white">Recent Documents</span>
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Recent Documents</span>
                 </div>
-                <button
-                  onClick={() => navigate('/documents')}
-                  className="text-xs text-brand-400 hover:text-brand-300 font-medium flex items-center gap-1 transition-colors"
-                >
+                <button onClick={() => navigate('/documents')}
+                  className="text-xs text-brand-400 hover:text-brand-300 font-medium flex items-center gap-1 transition-colors">
                   View all <ArrowRight size={12} />
                 </button>
               </div>
               <div className="divide-y divide-white/5">
-                {recentDocs.map(doc => (
-                  <RecentDocCard key={doc.id} doc={doc} />
-                ))}
+                {recentDocs.map(doc => <RecentDocCard key={doc.id} doc={doc} />)}
               </div>
             </motion.div>
           )}

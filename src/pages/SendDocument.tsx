@@ -13,6 +13,9 @@ import { createEmbeddedEditor } from '../api/embed'
 import { sendInvite, type Recipient } from '../api/invites'
 import { detectFields, generateSmartSubject } from '../api/ai'
 import { Spinner } from '../components/ui/Spinner'
+import { useAuth } from '../contexts/AuthContext'
+import { claimDoc } from '../hooks/useUserDocs'
+import { awardPoints } from '../hooks/useAchievements'
 import toast from 'react-hot-toast'
 import confetti from 'canvas-confetti'
 
@@ -62,6 +65,7 @@ function StepBar({ current }: { current: number }) {
 function UploadStep({ onUploaded }: { onUploaded: (doc: any) => void }) {
   const [uploading, setUploading] = useState(false)
   const [file, setFile] = useState<File | null>(null)
+  const { user } = useAuth()
 
   const onDrop = useCallback(async (accepted: File[]) => {
     const f = accepted[0]
@@ -70,6 +74,11 @@ function UploadStep({ onUploaded }: { onUploaded: (doc: any) => void }) {
     setUploading(true)
     try {
       const result = await uploadDocument(f)
+      // Claim this document for the current user
+      if (user?.sub && result.id) {
+        claimDoc(user.sub, result.id)
+        awardPoints(user.sub, 5, 'upload')
+      }
       toast.success('Document uploaded!')
       onUploaded({ ...result, _fileName: f.name })
     } catch (e: any) {
@@ -78,7 +87,7 @@ function UploadStep({ onUploaded }: { onUploaded: (doc: any) => void }) {
     } finally {
       setUploading(false)
     }
-  }, [onUploaded])
+  }, [onUploaded, user])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -589,6 +598,7 @@ function SendStep({ document, recipients, onBack }: {
   onBack: () => void
 }) {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
 
@@ -596,6 +606,7 @@ function SendStep({ document, recipients, onBack }: {
     setSending(true)
     try {
       await sendInvite(document.id, recipients)
+      if (user?.sub) awardPoints(user.sub, 10, 'send')
       setSent(true)
       confetti({
         particleCount: 120,

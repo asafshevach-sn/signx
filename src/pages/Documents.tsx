@@ -12,6 +12,8 @@ import { Badge } from '../components/ui/Badge'
 import { Spinner } from '../components/ui/Spinner'
 import { EmptyState } from '../components/ui/EmptyState'
 import { formatDistanceToNow } from 'date-fns'
+import { useAuth } from '../contexts/AuthContext'
+import { filterUserDocs } from '../hooks/useUserDocs'
 
 const FILTERS = [
   { key: '',          label: 'All',        icon: <Inbox size={14} /> },
@@ -112,6 +114,7 @@ function DocCard({ doc, onOpen }: { doc: Document; onOpen: (doc: Document) => vo
 
 export function Documents() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [docs, setDocs] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
@@ -134,9 +137,10 @@ export function Documents() {
         sortby: 'updated',
         order: 'desc',
       })
-      const groups = data.document_groups || []
+      const raw = data.document_groups || []
+      const groups = user?.sub ? filterUserDocs(user.sub, raw) : raw
       setDocs(reset ? groups : prev => [...prev, ...groups])
-      setTotal(data.document_group_total_count || 0)
+      setTotal(groups.length)
       setHasMore(data.has_more || false)
       setOffset(reset ? LIMIT : off + LIMIT)
     } catch (e) {
