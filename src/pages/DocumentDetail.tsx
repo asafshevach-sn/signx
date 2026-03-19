@@ -157,7 +157,7 @@ function AISummaryPanel({ document }: { document: any }) {
         ) : summary ? (
           <motion.div key="summary" initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}>
             <div className="p-4 rounded-xl text-sm text-slate-300 leading-relaxed mb-3"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              style={{ background: 'var(--bg-skeleton-a)', border: '1px solid var(--border-subtle)' }}>
               {summary}
             </div>
             <button

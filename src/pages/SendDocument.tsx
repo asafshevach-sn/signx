@@ -119,7 +119,7 @@ function UploadStep({ onUploaded }: { onUploaded: (doc: any) => void }) {
                 animate={{ y: [-3, 3, -3] }}
                 transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                 className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                style={{ background: 'rgba(255,255,255,0.06)' }}>
+                style={{ background: 'var(--bg-skeleton-a)' }}>
                 <Upload size={28} className="text-slate-400" />
               </motion.div>
               <div>
@@ -227,7 +227,7 @@ function FieldsStep({ document, onNext, onBack }: { document: any; onNext: (fiel
                     exit={{ opacity: 0, x: -20, height: 0 }}
                     transition={{ delay: i * 0.04 }}
                     className="flex items-center gap-4 p-4 rounded-2xl group"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+                    style={{ background: 'var(--bg-skeleton-a)', border: '1px solid var(--border-subtle)' }}
                   >
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg"
                       style={{ background: cfg.bg }}>
@@ -268,7 +268,7 @@ function FieldsStep({ document, onNext, onBack }: { document: any; onNext: (fiel
 
           {detected && fields.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 gap-3 rounded-2xl"
-              style={{ border: '1.5px dashed rgba(255,255,255,0.1)' }}>
+              style={{ border: '1.5px dashed var(--border-subtle)' }}>
               <PenLine size={24} className="text-slate-600" />
               <div className="text-slate-500 text-sm">No fields yet — add some below or continue without</div>
             </div>
@@ -526,7 +526,7 @@ function RecipientsStep({ document, recipients, setRecipients, onNext, onBack }:
       <button
         onClick={addRecipient}
         className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium text-slate-400 hover:text-white transition-all hover:bg-white/5"
-        style={{ border: '1.5px dashed rgba(255,255,255,0.12)' }}
+        style={{ border: '1.5px dashed var(--border-medium)' }}
       >
         <Plus size={16} />
         Add Recipient

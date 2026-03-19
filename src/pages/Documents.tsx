@@ -74,7 +74,7 @@ function DocCard({ doc, onOpen }: { doc: Document; onOpen: (doc: Document) => vo
           {/* Signing progress bar */}
           {signerCount > 0 && (
             <div className="mt-3">
-              <div className="w-full h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+              <div className="w-full h-1 rounded-full overflow-hidden" style={{ background: 'var(--bg-skeleton-a)' }}>
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${signerCount > 0 ? (completedCount / signerCount) * 100 : 0}%` }}

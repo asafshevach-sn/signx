@@ -36,7 +36,7 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
             className={`relative w-full ${sizes[size]} rounded-2xl overflow-hidden z-10`}
-            style={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)' }}
+            style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}
           >
             {title && (
               <div className="flex items-center justify-between px-6 py-4 border-b border-white/8">

@@ -70,7 +70,7 @@ function GettingStarted({ steps, totalDocs }: { steps: Step[], totalDocs: number
         </div>
         <div className="relative w-14 h-14 flex-shrink-0">
           <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
-            <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
+            <circle cx="28" cy="28" r="22" fill="none" stroke="var(--bg-skeleton-a)" strokeWidth="5" />
             <circle cx="28" cy="28" r="22" fill="none" stroke="url(#grad)" strokeWidth="5"
               strokeLinecap="round"
               strokeDasharray={`${2 * Math.PI * 22}`}
@@ -90,7 +90,7 @@ function GettingStarted({ steps, totalDocs }: { steps: Step[], totalDocs: number
       </div>
 
       {/* Progress bar */}
-      <div className="w-full h-1.5 rounded-full mb-5 overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+      <div className="w-full h-1.5 rounded-full mb-5 overflow-hidden" style={{ background: 'var(--bg-skeleton-a)' }}>
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${pct}%` }}
@@ -180,7 +180,7 @@ function ActivityBar({ label, value, max, color }: { label: string, value: numbe
   return (
     <div className="flex items-center gap-3">
       <div className="text-xs text-slate-400 w-24 truncate">{label}</div>
-      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-skeleton-a)' }}>
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${pct}%` }}

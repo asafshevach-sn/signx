@@ -225,6 +225,9 @@
 /* Very faint helper lines */
 [data-theme="light"] .text-slate-700 { color: #94a3b8 !important; }
 
+/* Hover states that turn text white */
+[data-theme="light"] .hover\:text-white:hover { color: #1e293b !important; }
+
 /* Brand/accent keep their colours in both themes */
 /* (text-brand-*, text-emerald-*, text-rose-*, text-amber-* etc. are fine as-is) */
 
