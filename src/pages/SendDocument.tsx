@@ -6,10 +6,9 @@ import {
   Upload, FileText, ChevronRight, ChevronLeft, Users,
   Plus, Trash2, Sparkles, Send, CheckCircle2, ArrowRight,
   Wand2, AlertCircle, GripVertical, Mail, UserCircle,
-  Eye, PenLine, ThumbsUp, Loader2, ExternalLink
+  Eye, PenLine, ThumbsUp
 } from 'lucide-react'
 import { uploadDocument } from '../api/documents'
-import { createEmbeddedEditor } from '../api/embed'
 import { sendInvite, type Recipient } from '../api/invites'
 import { detectFields, generateSmartSubject } from '../api/ai'
 import { Spinner } from '../components/ui/Spinner'
@@ -136,177 +135,217 @@ function UploadStep({ onUploaded }: { onUploaded: (doc: any) => void }) {
   )
 }
 
-// ─── Step 2: Add Fields (Embedded Editor) ─────────────────────────────────────
-function FieldsStep({ document, onNext, onBack }: { document: any; onNext: () => void; onBack: () => void }) {
-  const [loading, setLoading] = useState(false)
-  const [editorUrl, setEditorUrl] = useState<string | null>(null)
-  const [aiFields, setAiFields] = useState<any[]>([])
-  const [detectingFields, setDetectingFields] = useState(false)
-  const [editorDone, setEditorDone] = useState(false)
+// ─── Step 2: Add Fields (AI-powered) ─────────────────────────────────────────
+const FIELD_CONFIG: Record<string, { icon: string; color: string; bg: string }> = {
+  signature: { icon: '✍️', color: '#6366f1', bg: 'rgba(99,102,241,0.12)' },
+  initials:  { icon: '🔤', color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)' },
+  date:      { icon: '📅', color: '#0ea5e9', bg: 'rgba(14,165,233,0.12)' },
+  text:      { icon: '📝', color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
+  checkbox:  { icon: '☑️', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+}
 
-  async function openEditor() {
-    setLoading(true)
-    try {
-      const result = await createEmbeddedEditor(document.id)
-      setEditorUrl(result.url)
-    } catch (e: any) {
-      toast.error(e.response?.data?.error || 'Failed to open editor')
-    } finally {
-      setLoading(false)
-    }
-  }
+function FieldsStep({ document, onNext, onBack }: { document: any; onNext: (fields: any[]) => void; onBack: () => void }) {
+  const [fields, setFields] = useState<any[]>([])
+  const [detecting, setDetecting] = useState(false)
+  const [detected, setDetected] = useState(false)
 
-  async function detectAIFields() {
-    setDetectingFields(true)
+  // Auto-detect on mount
+  useState(() => {
+    runDetect()
+  })
+
+  async function runDetect() {
+    setDetecting(true)
     try {
       const result = await detectFields({
         documentName: document._fileName || document.name || 'Document',
         documentType: 'Agreement',
       })
-      setAiFields(result.fields || [])
-    } catch (e) {
-      toast.error('AI detection failed — try manually adding fields')
+      setFields(result.fields || [])
+      setDetected(true)
+    } catch {
+      setDetected(true)
     } finally {
-      setDetectingFields(false)
+      setDetecting(false)
     }
   }
 
-  const fieldTypeIcons: Record<string, string> = {
-    signature: '✍️', initials: '🔤', date: '📅',
-    text: '📝', checkbox: '☑️', radio: '🔘',
+  function removeField(i: number) {
+    setFields(f => f.filter((_, idx) => idx !== i))
   }
+
+  function addManualField(type: string) {
+    setFields(f => [...f, {
+      type,
+      label: `${type.charAt(0).toUpperCase() + type.slice(1)} Field`,
+      description: '',
+      page: 1,
+      importance: 'required',
+    }])
+  }
+
+  const required = fields.filter(f => f.importance === 'required').length
+  const recommended = fields.filter(f => f.importance === 'recommended').length
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-      <h2 className="text-2xl font-display font-bold text-white mb-2">Add signature fields</h2>
-      <p className="text-slate-400 mb-8">Place where recipients need to sign, date, or fill in information</p>
+      <div className="flex items-start justify-between mb-8">
+        <div>
+          <h2 className="text-2xl font-display font-bold text-white mb-2">Configure signature fields</h2>
+          <p className="text-slate-400">AI has analysed your document and suggested the fields below — review and adjust as needed</p>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold"
+          style={{ background: 'rgba(139,92,246,0.15)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.25)' }}>
+          <Sparkles size={12} />
+          AI-Powered
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* AI Panel */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="card" style={{ borderColor: 'rgba(139,92,246,0.2)', background: 'rgba(139,92,246,0.05)' }}>
-            <div className="flex items-center gap-2 mb-3">
-              <Wand2 size={16} className="text-violet-400" />
-              <span className="text-sm font-semibold text-white">AI Field Detection</span>
-            </div>
-            <p className="text-xs text-slate-400 mb-4">
-              Let AI suggest where to place signature, date, and text fields based on your document type.
-            </p>
-            <button
-              onClick={detectAIFields}
-              disabled={detectingFields}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
-              style={{
-                background: 'linear-gradient(135deg, rgba(139,92,246,0.3), rgba(99,102,241,0.3))',
-                border: '1px solid rgba(139,92,246,0.3)',
-                color: '#c4b5fd',
-              }}
-            >
-              {detectingFields ? <Spinner size={14} /> : <Sparkles size={14} />}
-              {detectingFields ? 'Detecting...' : 'Detect Fields'}
-            </button>
 
-            {aiFields.length > 0 && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 space-y-2">
-                <div className="text-xs text-slate-400 font-medium uppercase tracking-wider mb-2">Suggested Fields</div>
-                {aiFields.map((f, i) => (
+        {/* Left: field list */}
+        <div className="lg:col-span-3 space-y-3">
+          {detecting ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-4">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                style={{ background: 'rgba(139,92,246,0.15)' }}>
+                <Sparkles size={24} className="text-violet-400 animate-pulse" />
+              </div>
+              <div className="text-white font-medium">AI is analysing your document...</div>
+              <div className="text-sm text-slate-500">Detecting signature, date, and text fields</div>
+            </div>
+          ) : (
+            <AnimatePresence>
+              {fields.map((f, i) => {
+                const cfg = FIELD_CONFIG[f.type] || FIELD_CONFIG.text
+                return (
                   <motion.div
                     key={i}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.06 }}
-                    className="flex items-center gap-2 p-2.5 rounded-lg"
-                    style={{ background: 'rgba(255,255,255,0.04)' }}
+                    layout
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -20, height: 0 }}
+                    transition={{ delay: i * 0.04 }}
+                    className="flex items-center gap-4 p-4 rounded-2xl group"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
                   >
-                    <span className="text-base">{fieldTypeIcons[f.type] || '📋'}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-white font-medium">{f.label}</div>
-                      <div className="text-[11px] text-slate-500">Page {f.page}</div>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg"
+                      style={{ background: cfg.bg }}>
+                      {cfg.icon}
                     </div>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                      f.importance === 'required'
-                        ? 'bg-rose-500/15 text-rose-400'
-                        : f.importance === 'recommended'
-                        ? 'bg-amber-500/15 text-amber-400'
-                        : 'bg-slate-500/15 text-slate-400'
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-white">{f.label}</div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[11px] text-slate-500 capitalize">{f.type}</span>
+                        <span className="text-slate-700">·</span>
+                        <span className="text-[11px] text-slate-500">Page {f.page}</span>
+                        {f.description && (
+                          <>
+                            <span className="text-slate-700">·</span>
+                            <span className="text-[11px] text-slate-500 truncate">{f.description}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <span className={`text-[10px] px-2 py-1 rounded-full font-semibold flex-shrink-0 ${
+                      f.importance === 'required' ? 'bg-rose-500/15 text-rose-400' :
+                      f.importance === 'recommended' ? 'bg-amber-500/15 text-amber-400' :
+                      'bg-slate-500/15 text-slate-400'
                     }`}>
                       {f.importance}
                     </span>
+                    <button
+                      onClick={() => removeField(i)}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-all"
+                    >
+                      <Trash2 size={13} />
+                    </button>
                   </motion.div>
-                ))}
-              </motion.div>
-            )}
+                )
+              })}
+            </AnimatePresence>
+          )}
+
+          {detected && fields.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 gap-3 rounded-2xl"
+              style={{ border: '1.5px dashed rgba(255,255,255,0.1)' }}>
+              <PenLine size={24} className="text-slate-600" />
+              <div className="text-slate-500 text-sm">No fields yet — add some below or continue without</div>
+            </div>
+          )}
+        </div>
+
+        {/* Right: controls */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Summary */}
+          {fields.length > 0 && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              className="card" style={{ borderColor: 'rgba(99,102,241,0.2)', background: 'rgba(99,102,241,0.06)' }}>
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle2 size={14} className="text-brand-400" />
+                <span className="text-sm font-semibold text-white">{fields.length} fields configured</span>
+              </div>
+              <div className="flex gap-3">
+                {required > 0 && (
+                  <div className="text-xs px-2.5 py-1 rounded-lg" style={{ background: 'rgba(244,63,94,0.12)', color: '#fb7185' }}>
+                    {required} required
+                  </div>
+                )}
+                {recommended > 0 && (
+                  <div className="text-xs px-2.5 py-1 rounded-lg" style={{ background: 'rgba(245,158,11,0.12)', color: '#fbbf24' }}>
+                    {recommended} recommended
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Add manual fields */}
+          <div className="card">
+            <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-3">Add Field Manually</div>
+            <div className="grid grid-cols-3 gap-2">
+              {Object.entries(FIELD_CONFIG).map(([type, cfg]) => (
+                <button
+                  key={type}
+                  onClick={() => addManualField(type)}
+                  className="flex flex-col items-center gap-1.5 py-3 rounded-xl text-xs font-medium transition-all hover:scale-105 active:scale-95"
+                  style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.color}22` }}
+                >
+                  <span className="text-lg">{cfg.icon}</span>
+                  <span className="capitalize">{type}</span>
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* Re-detect */}
+          <button
+            onClick={runDetect}
+            disabled={detecting}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all"
+            style={{
+              background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(99,102,241,0.2))',
+              border: '1px solid rgba(139,92,246,0.25)',
+              color: '#c4b5fd',
+            }}
+          >
+            {detecting ? <Spinner size={14} /> : <Wand2 size={14} />}
+            {detecting ? 'Detecting...' : 'Re-run AI Detection'}
+          </button>
 
           {/* Document info */}
           <div className="card">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center"
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
                 style={{ background: 'rgba(99,102,241,0.15)' }}>
-                <FileText size={18} className="text-brand-400" />
+                <FileText size={16} className="text-brand-400" />
               </div>
-              <div>
-                <div className="text-sm font-medium text-white">{document._fileName || 'Document'}</div>
-                <div className="text-xs text-slate-500">ID: {document.id?.slice(0, 12)}...</div>
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-white truncate">{document._fileName || 'Document'}</div>
+                <div className="text-[11px] text-slate-500">Ready to configure</div>
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Editor panel */}
-        <div className="lg:col-span-3">
-          {editorUrl ? (
-            <div className="flex flex-col gap-3">
-              <div className="rounded-2xl overflow-hidden border border-white/10" style={{ height: '480px' }}>
-                <iframe src={editorUrl} className="w-full h-full border-0" title="Document Editor" />
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => { setEditorDone(true); setEditorUrl(null) }}
-                  className="btn-primary flex-1 flex items-center justify-center gap-2"
-                >
-                  <CheckCircle2 size={15} />
-                  Fields Added — Continue
-                </button>
-                <a href={editorUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary flex items-center gap-2">
-                  <ExternalLink size={14} />
-                  Open Full
-                </a>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-64 rounded-2xl border border-dashed border-white/15 gap-4">
-              {editorDone ? (
-                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex flex-col items-center gap-3">
-                  <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 flex items-center justify-center">
-                    <CheckCircle2 size={28} className="text-emerald-400" />
-                  </div>
-                  <div className="text-white font-semibold">Fields configured!</div>
-                  <div className="text-xs text-slate-500">Ready to add recipients</div>
-                </motion.div>
-              ) : (
-                <>
-                  <div className="text-slate-400 text-sm text-center px-6">
-                    Open the visual editor to drag & drop signature fields onto your document
-                  </div>
-                  <button
-                    onClick={openEditor}
-                    disabled={loading}
-                    className="btn-primary flex items-center gap-2"
-                  >
-                    {loading ? <Spinner size={15} /> : <PenLine size={15} />}
-                    Open Editor
-                  </button>
-                  <button
-                    onClick={onNext}
-                    className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
-                  >
-                    Skip — recipients can sign existing fields
-                  </button>
-                </>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
@@ -314,8 +353,8 @@ function FieldsStep({ document, onNext, onBack }: { document: any; onNext: () =>
         <button onClick={onBack} className="btn-secondary flex items-center gap-2">
           <ChevronLeft size={15} /> Back
         </button>
-        <button onClick={onNext} className="btn-primary flex items-center gap-2 ml-auto">
-          Continue <ChevronRight size={15} />
+        <button onClick={() => onNext(fields)} className="btn-primary flex items-center gap-2 ml-auto">
+          Continue to Recipients <ChevronRight size={15} />
         </button>
       </div>
     </motion.div>
@@ -665,11 +704,17 @@ function SendStep({ document, recipients, onBack }: {
 export function SendDocument() {
   const [step, setStep] = useState(1)
   const [uploadedDoc, setUploadedDoc] = useState<any>(null)
+  const [docFields, setDocFields] = useState<any[]>([])
   const [recipients, setRecipients] = useState<RecipientRow[]>([])
 
   function handleUploaded(doc: any) {
     setUploadedDoc(doc)
     setStep(2)
+  }
+
+  function handleFieldsDone(fields: any[]) {
+    setDocFields(fields)
+    setStep(3)
   }
 
   return (
@@ -686,7 +731,7 @@ export function SendDocument() {
           <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
             <FieldsStep
               document={uploadedDoc}
-              onNext={() => setStep(3)}
+              onNext={handleFieldsDone}
               onBack={() => setStep(1)}
             />
           </motion.div>
