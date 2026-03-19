@@ -86,7 +86,7 @@ async function uploadDoc(fileBuffer, filename) {
   const token = await getToken();
   const form = new FormData();
   form.append('file', fileBuffer, { filename, contentType: 'application/pdf' });
-  const res = await axios.post(`${BASE_URL}/document/multipart`, form, {
+  const res = await axios.post(`${BASE_URL}/document`, form, {
     headers: { 'Authorization': `Bearer ${token}`, ...form.getHeaders() }
   });
   return res.data;
@@ -176,8 +176,9 @@ app.use(express.json());
 const errHandler = (fn) => async (req, res) => {
   try { await fn(req, res); }
   catch (e) {
-    console.error(e.response?.data || e.message);
-    res.status(500).json({ error: e.response?.data?.message || e.message });
+    const detail = e.response?.data;
+    console.error('API Error:', e.response?.status, JSON.stringify(detail) || e.message);
+    res.status(500).json({ error: e.response?.data?.error || e.response?.data?.message || e.message, detail });
   }
 };
 
