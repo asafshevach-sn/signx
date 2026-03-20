@@ -19,6 +19,16 @@ const STATIC_TOKEN = process.env.SIGNNOW_API_TOKEN?.trim() || null;
 
 let cachedToken = null;
 let tokenExpiry = null;
+let cachedUsername = null; // lazily fetched from /user if USERNAME env var is not set
+
+async function getFromEmail() {
+  if (USERNAME) return USERNAME;
+  if (cachedUsername) return cachedUsername;
+  const token = await getToken();
+  const res = await api(token).get('/user');
+  cachedUsername = res.data?.email || res.data?.primary_email || null;
+  return cachedUsername;
+}
 
 async function getToken() {
   if (STATIC_TOKEN) return STATIC_TOKEN;
@@ -162,6 +172,7 @@ async function createEmbeddedSendingAPI(documentId, options = {}) {
 
 async function sendInviteAPI(documentId, recipients) {
   const token = await getToken();
+  const fromEmail = await getFromEmail();
   // Build the to array for field invite
   const to = recipients.map(r => ({
     email: r.email, role: r.role, order: r.order || 1,
@@ -170,17 +181,16 @@ async function sendInviteAPI(documentId, recipients) {
   }));
   try {
     // Try field invite first (works when document has roles/fields defined)
-    const res = await api(token).post(`/document/${documentId}/invite`, { to, from: USERNAME, document_id: documentId });
+    const res = await api(token).post(`/document/${documentId}/invite`, { to, from: fromEmail, document_id: documentId });
     return res.data;
   } catch (e) {
-    // Fall back to freeform invite when document has no fields yet
-    if (e.response?.status === 400) {
-      console.log('[invite] field invite failed, falling back to freeform:', JSON.stringify(e.response?.data));
-      // Freeform invite: sends a signing link without requiring predefined fields
-      // SignNow supports multiple recipients via sequential freeform invites
+    const status = e.response?.status;
+    // Fall back to freeform invite when role mismatch, no fields, or other client errors
+    if (status === 400 || status === 404 || status === 422) {
+      console.log(`[invite] field invite failed (${status}), falling back to freeform:`, JSON.stringify(e.response?.data));
       const first = recipients[0];
       const res2 = await api(token).post(`/document/${documentId}/freeforminvite`, {
-        from: USERNAME,
+        from: fromEmail,
         to: first.email,
         subject: first.subject || `Please sign: ${documentId}`,
         message: first.message || 'Please review and sign this document.',
