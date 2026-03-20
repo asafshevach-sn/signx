@@ -193,14 +193,21 @@ function FieldsStep({ document, onNext, onBack }: { document: any; onNext: (fiel
     text: '📝', checkbox: '☑️',
   }
 
-  // Full-screen embedded editor mode
+  // Full-screen embedded editor overlay
   if (editorUrl) {
     return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col" style={{ height: 'calc(100vh - 160px)' }}>
-        <div className="flex items-center justify-between mb-4 flex-shrink-0">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="fixed inset-0 z-50 flex flex-col"
+        style={{ background: 'var(--bg-page, #020617)' }}
+      >
+        {/* Toolbar */}
+        <div className="flex items-center justify-between px-6 py-3 flex-shrink-0"
+          style={{ borderBottom: '1px solid var(--border-medium)', background: 'var(--bg-elevated)' }}>
           <div>
-            <h2 className="text-xl font-display font-bold text-white">Add fields to your document</h2>
-            <p className="text-sm text-slate-400 mt-0.5">Drag & drop signature, date, and text fields directly onto the document</p>
+            <h2 className="text-sm font-semibold text-white">Add fields to your document</h2>
+            <p className="text-xs text-slate-400">Drag & drop signature, date, and text fields directly onto the document</p>
           </div>
           <div className="flex gap-2">
             <button onClick={() => setEditorUrl(null)} className="btn-secondary flex items-center gap-2 text-sm">
@@ -211,7 +218,8 @@ function FieldsStep({ document, onNext, onBack }: { document: any; onNext: (fiel
             </button>
           </div>
         </div>
-        <div className="flex-1 rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border-medium)', minHeight: 0 }}>
+        {/* Full-height iframe */}
+        <div className="flex-1 min-h-0">
           <iframe src={editorUrl} className="w-full h-full border-0" title="SignNow Document Editor" allow="clipboard-write" />
         </div>
       </motion.div>
