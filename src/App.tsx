@@ -9,8 +9,13 @@ import { Settings } from './pages/Settings'
 import { Reports } from './pages/Reports'
 import { Login } from './pages/Login'
 import { useAuth } from './contexts/AuthContext'
+import { useWebhookEvents } from './hooks/useWebhookEvents'
 
 function ProtectedApp() {
+  const { user } = useAuth()
+  // Poll for SignNow webhook events while the user is logged in
+  useWebhookEvents(user?.sub)
+
   return (
     <Layout>
       <Routes>

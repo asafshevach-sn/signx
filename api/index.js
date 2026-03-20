@@ -14,7 +14,8 @@ const USERNAME = process.env.SIGNNOW_USERNAME;
 const PASSWORD = process.env.SIGNNOW_PASSWORD;
 
 // If SIGNNOW_API_TOKEN is set, use it directly (premium plan token bypasses OAuth)
-const STATIC_TOKEN = process.env.SIGNNOW_API_TOKEN;
+// .trim() is critical — env vars stored via `echo "x" | vercel env add` include a trailing newline
+const STATIC_TOKEN = process.env.SIGNNOW_API_TOKEN?.trim() || null;
 
 let cachedToken = null;
 let tokenExpiry = null;
@@ -321,6 +322,38 @@ app.post('/api/ai/smart-subject', errHandler(async (req, res) => {
   });
   res.json({ subject: message.content[0].text.trim() });
 }));
+
+// ─── Webhook Event Queue ─────────────────────────────────────────────────────
+// Module-level ring buffer — survives within a single function instance lifetime.
+// Frontend polls /api/events?since=<ms> to drain new entries.
+const MAX_EVENTS = 200;
+const eventQueue = [];
+
+function pushEvent(evt) {
+  eventQueue.push({ ...evt, receivedAt: Date.now() });
+  if (eventQueue.length > MAX_EVENTS) eventQueue.shift();
+}
+
+// SignNow webhook receiver
+app.post('/api/webhooks/signnow', express.json(), (req, res) => {
+  const body = req.body;
+  const event = body?.meta?.event || body?.event || body?.type || 'unknown';
+  const docId  = body?.content?.document_id || body?.data?.document_id || body?.document_id;
+  const docName = body?.content?.document_name || body?.data?.document_name || '';
+  const signerEmail = body?.content?.signer_email || body?.data?.email || body?.data?.signer_email || '';
+
+  console.log(`[webhook] event=${event} doc=${docId} signer=${signerEmail}`);
+
+  pushEvent({ event, docId, docName, signerEmail });
+  res.status(200).json({ received: true });
+});
+
+// Frontend polls this endpoint for recent webhook events
+app.get('/api/events', (req, res) => {
+  const since = parseInt(req.query.since || '0', 10);
+  const fresh = eventQueue.filter(e => e.receivedAt > since);
+  res.json({ events: fresh, serverTime: Date.now() });
+});
 
 // ─── Export for Vercel ───────────────────────────────────────────────────────
 // In development, also listen on a port
