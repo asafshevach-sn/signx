@@ -117,16 +117,20 @@ async function createFromTemplate(templateId, name) {
 }
 
 function extractUrl(data) {
-  return data?.data?.url || data?.url || data?.link || data?.data?.link || null;
+  // SignNow embedded editor returns { editor_url: "..." }
+  // Embedded sending returns { url: "..." } or { data: { url: "..." } }
+  return data?.editor_url || data?.sending_url || data?.data?.url || data?.url || data?.link || null;
 }
 
 async function createEmbeddedEditorAPI(documentId, options = {}) {
   const token = await getToken();
-  const body = { link_expiration: options.linkExpiration || 90 };
+  // Correct endpoint: /v2/documents/{id}/embedded-editor (hyphen, NOT /embedded/editor)
+  // Max link_expiration is 45 minutes
+  const body = { link_expiration: Math.min(options.linkExpiration || 45, 45) };
   if (options.redirectUri) body.redirect_uri = options.redirectUri;
-  console.log(`[embed/editor] documentId=${documentId} token_prefix=${token.slice(0,8)}`);
+  console.log(`[embed/editor] documentId=${documentId}`);
   try {
-    const res = await api(token).post(`/v2/documents/${documentId}/embedded/editor`, body);
+    const res = await api(token).post(`/v2/documents/${documentId}/embedded-editor`, body);
     console.log('[embed/editor] success:', JSON.stringify(res.data).slice(0, 300));
     const url = extractUrl(res.data);
     if (!url) throw new Error(`No URL in response: ${JSON.stringify(res.data)}`);
@@ -139,11 +143,13 @@ async function createEmbeddedEditorAPI(documentId, options = {}) {
 
 async function createEmbeddedSendingAPI(documentId, options = {}) {
   const token = await getToken();
-  const body = { link_expiration: options.linkExpiration || 30, type: options.type || 'manage' };
+  // Correct endpoint: /v2/documents/{id}/embedded-sending
+  // link_expiration is in DAYS (14–45), type: manage | edit | send-invite
+  const body = { link_expiration: options.linkExpiration || 14, type: options.type || 'manage' };
   if (options.redirectUri) body.redirect_uri = options.redirectUri;
   console.log(`[embed/sending] documentId=${documentId}`);
   try {
-    const res = await api(token).post(`/v2/documents/${documentId}/embedded/sending`, body);
+    const res = await api(token).post(`/v2/documents/${documentId}/embedded-sending`, body);
     console.log('[embed/sending] success:', JSON.stringify(res.data).slice(0, 300));
     const url = extractUrl(res.data);
     if (!url) throw new Error(`No URL in response: ${JSON.stringify(res.data)}`);
@@ -156,9 +162,33 @@ async function createEmbeddedSendingAPI(documentId, options = {}) {
 
 async function sendInviteAPI(documentId, recipients) {
   const token = await getToken();
-  const to = recipients.map(r => ({ email: r.email, role: r.role, order: r.order || 1, ...(r.subject ? { subject: r.subject } : {}), ...(r.message ? { message: r.message } : {}) }));
-  const res = await api(token).post(`/document/${documentId}/invite`, { to, from: USERNAME, document_id: documentId });
-  return res.data;
+  // Build the to array for field invite
+  const to = recipients.map(r => ({
+    email: r.email, role: r.role, order: r.order || 1,
+    ...(r.subject ? { subject: r.subject } : {}),
+    ...(r.message ? { message: r.message } : {}),
+  }));
+  try {
+    // Try field invite first (works when document has roles/fields defined)
+    const res = await api(token).post(`/document/${documentId}/invite`, { to, from: USERNAME, document_id: documentId });
+    return res.data;
+  } catch (e) {
+    // Fall back to freeform invite when document has no fields yet
+    if (e.response?.status === 400) {
+      console.log('[invite] field invite failed, falling back to freeform:', JSON.stringify(e.response?.data));
+      // Freeform invite: sends a signing link without requiring predefined fields
+      // SignNow supports multiple recipients via sequential freeform invites
+      const first = recipients[0];
+      const res2 = await api(token).post(`/document/${documentId}/freeforminvite`, {
+        from: USERNAME,
+        to: first.email,
+        subject: first.subject || `Please sign: ${documentId}`,
+        message: first.message || 'Please review and sign this document.',
+      });
+      return res2.data;
+    }
+    throw e;
+  }
 }
 
 async function getInviteStatusAPI(documentId) {
