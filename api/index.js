@@ -173,32 +173,41 @@ async function createEmbeddedSendingAPI(documentId, options = {}) {
 async function sendInviteAPI(documentId, recipients) {
   const token = await getToken();
   const fromEmail = await getFromEmail();
-  // Build the to array for field invite
-  const to = recipients.map(r => ({
-    email: r.email, role: r.role, order: r.order || 1,
+
+  // Fetch the document's actual role names — the user's form uses display labels
+  // (e.g. "Recipient 1") which won't match SignNow roles (e.g. "Signer 1")
+  let docRoles = [];
+  try {
+    const docRes = await api(token).get(`/document/${documentId}`);
+    docRoles = (docRes.data.roles || []).map(r => r.name || r);
+  } catch {}
+  console.log(`[invite] docRoles=${JSON.stringify(docRoles)} recipients=${recipients.length}`);
+
+  if (docRoles.length === 0) {
+    // No fields/roles defined — use freeform invite
+    console.log('[invite] no roles, using freeform invite');
+    const first = recipients[0];
+    const res = await api(token).post(`/document/${documentId}/freeforminvite`, {
+      from: fromEmail,
+      to: first.email,
+      subject: first.subject || `Please sign this document`,
+      message: first.message || 'Please review and sign this document.',
+    });
+    return res.data;
+  }
+
+  // Map recipients positionally to actual document role names
+  const to = recipients.map((r, i) => ({
+    email: r.email,
+    role: docRoles[i] || docRoles[0], // use real SignNow role, not UI label
+    order: r.order || i + 1,
     ...(r.subject ? { subject: r.subject } : {}),
     ...(r.message ? { message: r.message } : {}),
   }));
-  try {
-    // Try field invite first (works when document has roles/fields defined)
-    const res = await api(token).post(`/document/${documentId}/invite`, { to, from: fromEmail, document_id: documentId });
-    return res.data;
-  } catch (e) {
-    const status = e.response?.status;
-    // Fall back to freeform invite when role mismatch, no fields, or other client errors
-    if (status === 400 || status === 404 || status === 422) {
-      console.log(`[invite] field invite failed (${status}), falling back to freeform:`, JSON.stringify(e.response?.data));
-      const first = recipients[0];
-      const res2 = await api(token).post(`/document/${documentId}/freeforminvite`, {
-        from: fromEmail,
-        to: first.email,
-        subject: first.subject || `Please sign: ${documentId}`,
-        message: first.message || 'Please review and sign this document.',
-      });
-      return res2.data;
-    }
-    throw e;
-  }
+
+  console.log('[invite] sending field invite with to:', JSON.stringify(to));
+  const res = await api(token).post(`/document/${documentId}/invite`, { to, from: fromEmail, document_id: documentId });
+  return res.data;
 }
 
 async function getInviteStatusAPI(documentId) {

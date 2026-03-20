@@ -193,6 +193,30 @@ function FieldsStep({ document, onNext, onBack }: { document: any; onNext: (fiel
     text: '📝', checkbox: '☑️',
   }
 
+  // Listen for SignNow postMessage events — fires when user clicks "Save and Close"
+  useEffect(() => {
+    if (!editorUrl) return
+    function handleMessage(e: MessageEvent) {
+      // SignNow sends messages from app.signnow.com or signnow.com
+      if (!e.origin.includes('signnow.com')) return
+      const data = e.data
+      // Various event shapes SignNow may send on save/close
+      const isSaveClose =
+        data?.event === 'save_and_close' ||
+        data?.type === 'save_and_close' ||
+        data?.action === 'close' ||
+        data?.event === 'document.saved' ||
+        data?.type === 'document:saved' ||
+        data?.type === 'close'
+      if (isSaveClose) {
+        setEditorDone(true)
+        setEditorUrl(null)
+      }
+    }
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [editorUrl])
+
   // Full-screen embedded editor overlay
   if (editorUrl) {
     return (
@@ -207,7 +231,9 @@ function FieldsStep({ document, onNext, onBack }: { document: any; onNext: (fiel
           style={{ borderBottom: '1px solid var(--border-medium)', background: 'var(--bg-elevated)' }}>
           <div>
             <h2 className="text-sm font-semibold text-white">Add fields to your document</h2>
-            <p className="text-xs text-slate-400">Drag & drop signature, date, and text fields directly onto the document</p>
+            <p className="text-xs text-slate-400">
+              When done, click <strong className="text-white">"Save and Close"</strong> in the editor — it will advance automatically.
+            </p>
           </div>
           <div className="flex gap-2">
             <button onClick={() => setEditorUrl(null)} className="btn-secondary flex items-center gap-2 text-sm">
