@@ -372,6 +372,105 @@ app.post('/api/ai/smart-subject', errHandler(async (req, res) => {
   res.json({ subject: message.content[0].text.trim() });
 }));
 
+// ─── Brand / White-label API ──────────────────────────────────────────────────
+let cachedOrgId = null;
+let cachedBrandId = null;
+
+async function getOrgId() {
+  if (cachedOrgId) return cachedOrgId;
+  const token = await getToken();
+  const res = await api(token).get('/user');
+  const orgs = res.data?.organizations || [];
+  if (!orgs.length) throw new Error('No organization found — organization account required for branding');
+  cachedOrgId = orgs[0]?.id || orgs[0];
+  return cachedOrgId;
+}
+
+async function getOrCreateOrgBrand(orgId) {
+  if (cachedBrandId) return { id: cachedBrandId };
+  const token = await getToken();
+  try {
+    const res = await api(token).get(`/v2/organizations/${orgId}/brands`);
+    const brands = Array.isArray(res.data) ? res.data : (res.data?.data || res.data?.items || []);
+    if (brands.length > 0) {
+      cachedBrandId = brands[0].id || brands[0].brand_id;
+      return brands[0];
+    }
+  } catch (e) {
+    console.log('[brand] list brands error:', e.response?.status, e.response?.data);
+  }
+  const res = await api(token).post(`/v2/organizations/${orgId}/brands`, { title: 'SignX Brand' });
+  cachedBrandId = res.data?.id || res.data?.brand_id;
+  return res.data;
+}
+
+app.get('/api/brand', errHandler(async (req, res) => {
+  const orgId = await getOrgId();
+  const brand = await getOrCreateOrgBrand(orgId);
+  const brandId = brand.id || brand.brand_id;
+  const token = await getToken();
+  const [genRes, emailRes] = await Promise.allSettled([
+    api(token).get(`/v2/organizations/${orgId}/brands/${brandId}/resources/general`),
+    api(token).get(`/v2/organizations/${orgId}/brands/${brandId}/resources/email`),
+  ]);
+  res.json({
+    orgId,
+    brandId,
+    title: brand.title || 'SignX Brand',
+    general: genRes.status === 'fulfilled' ? genRes.value.data : null,
+    email: emailRes.status === 'fulfilled' ? emailRes.value.data : null,
+  });
+}));
+
+app.post('/api/brand', errHandler(async (req, res) => {
+  const { orgId, brandId, primaryColor, headerBackground, mainBackground, senderEmail, hideSignNowRef } = req.body;
+  const token = await getToken();
+  const updates = [];
+
+  if (primaryColor || headerBackground || mainBackground) {
+    const body = {};
+    if (mainBackground) body['main-background'] = mainBackground;
+    if (headerBackground) body.header = { background: headerBackground };
+    if (primaryColor) body.buttons = {
+      primary: {
+        color: '#ffffff', background: primaryColor, border: primaryColor,
+        'hover-background': primaryColor, 'hover-color': '#ffffff', 'hover-border': primaryColor,
+        'active-background': primaryColor, 'active-color': '#ffffff', 'active-border': primaryColor,
+      },
+    };
+    updates.push(api(token).put(`/v2/organizations/${orgId}/brands/${brandId}/resources/general`, body));
+  }
+
+  if (senderEmail !== undefined || hideSignNowRef !== undefined) {
+    const emailBody = {};
+    if (senderEmail) emailBody.sender_email = senderEmail;
+    if (hideSignNowRef !== undefined) emailBody.signnow_references = !hideSignNowRef;
+    updates.push(api(token).put(`/v2/organizations/${orgId}/brands/${brandId}/resources/email`, emailBody));
+  }
+
+  await Promise.allSettled(updates);
+  // Assign brand to org so it applies to all invites
+  try {
+    await api(token).put(`/v2/organizations/${orgId}/brand`, { brand_id: brandId });
+  } catch (e) {
+    console.log('[brand] assign error (non-fatal):', e.response?.status, e.response?.data);
+  }
+  res.json({ success: true });
+}));
+
+app.post('/api/brand/logo', upload.single('logo'), errHandler(async (req, res) => {
+  const { orgId, brandId } = req.body;
+  const token = await getToken();
+  const form = new FormData();
+  form.append('logo', req.file.buffer, { filename: req.file.originalname, contentType: req.file.mimetype });
+  const logoRes = await axios.post(
+    `${BASE_URL}/v2/organizations/${orgId}/brands/${brandId}/resources/logo`,
+    form,
+    { headers: { 'Authorization': `Bearer ${token}`, ...form.getHeaders() } }
+  );
+  res.json(logoRes.data);
+}));
+
 // ─── Webhook Event Queue ─────────────────────────────────────────────────────
 // Module-level ring buffer — survives within a single function instance lifetime.
 // Frontend polls /api/events?since=<ms> to drain new entries.

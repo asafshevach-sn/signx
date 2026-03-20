@@ -1,19 +1,12 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { formatDistanceToNow, format } from 'date-fns'
+import { formatDistanceToNow } from 'date-fns'
 import {
   BarChart3, TrendingUp, FileText, CheckCircle2,
   Clock, AlertTriangle, FileX, ArrowRight, Users, Activity
 } from 'lucide-react'
-
-interface Stats {
-  total: number
-  signed: number
-  waitingForOthers: number
-  waitingForMe: number
-  expired: number
-  drafts: number
-}
+import { useAuth } from '../contexts/AuthContext'
+import { filterUserDocs } from '../hooks/useUserDocs'
 
 interface Doc {
   id: string
@@ -96,25 +89,35 @@ function FunnelStep({ label, value, total, color, isLast }: {
 }
 
 export function Reports() {
-  const [stats, setStats] = useState<Stats | null>(null)
+  const { user } = useAuth()
   const [docs, setDocs] = useState<Doc[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/stats').then(r => r.json()),
-      fetch('/api/documents?limit=100').then(r => r.json()),
-    ]).then(([s, d]) => {
-      setStats(s)
-      setDocs(d.document_groups || [])
-      setLoading(false)
-    }).catch(() => setLoading(false))
-  }, [])
+    fetch('/api/documents?limit=100')
+      .then(r => r.json())
+      .then(d => {
+        const raw: Doc[] = d.document_groups || []
+        const mine = user?.sub ? filterUserDocs(user.sub, raw) : raw
+        setDocs(mine)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [user?.sub])
 
-  const completionRate = stats && stats.total > 0
+  // Compute stats from filtered docs (same as Dashboard)
+  const stats = {
+    total: docs.length,
+    signed: docs.filter(d => d.invite?.status === 'completed').length,
+    waitingForOthers: docs.filter(d => d.invite?.status === 'pending' && !d.invite?.expired).length,
+    expired: docs.filter(d => d.invite?.expired === true).length,
+    drafts: docs.filter(d => !d.invite).length,
+  }
+
+  const completionRate = stats.total > 0
     ? Math.round((stats.signed / stats.total) * 100) : 0
 
-  const sent = stats ? (stats.signed + stats.waitingForOthers + stats.expired) : 0
+  const sent = stats.signed + stats.waitingForOthers + stats.expired
   const recentDocs = [...docs]
     .sort((a, b) => b.last_updated - a.last_updated)
     .slice(0, 8)
@@ -143,10 +146,10 @@ export function Reports() {
           {loading ? (
             Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
           ) : ([
-            { label: 'Total Documents', value: stats?.total ?? 0, color: '#6366f1', icon: <FileText size={18} /> },
+            { label: 'Total Documents', value: stats.total, color: '#6366f1', icon: <FileText size={18} /> },
             { label: 'Completion Rate', value: `${completionRate}%`, color: '#10b981', icon: <TrendingUp size={18} /> },
-            { label: 'Awaiting Signature', value: stats?.waitingForOthers ?? 0, color: '#f59e0b', icon: <Clock size={18} /> },
-            { label: 'Expired', value: stats?.expired ?? 0, color: '#f43f5e', icon: <AlertTriangle size={18} /> },
+            { label: 'Awaiting Signature', value: stats.waitingForOthers, color: '#f59e0b', icon: <Clock size={18} /> },
+            { label: 'Expired', value: stats.expired, color: '#f43f5e', icon: <AlertTriangle size={18} /> },
           ].map(({ label, value, color, icon }) => (
             <motion.div
               key={label}
@@ -179,13 +182,13 @@ export function Reports() {
               </div>
             ) : (
               <div className="space-y-4">
-                <StatBar label="Completed" value={stats?.signed ?? 0} total={stats?.total ?? 1}
+                <StatBar label="Completed" value={stats.signed} total={stats.total || 1}
                   color="#10b981" icon={<CheckCircle2 size={14} />} />
-                <StatBar label="Pending" value={stats?.waitingForOthers ?? 0} total={stats?.total ?? 1}
+                <StatBar label="Pending" value={stats.waitingForOthers} total={stats.total || 1}
                   color="#f59e0b" icon={<Clock size={14} />} />
-                <StatBar label="Expired" value={stats?.expired ?? 0} total={stats?.total ?? 1}
+                <StatBar label="Expired" value={stats.expired} total={stats.total || 1}
                   color="#f43f5e" icon={<AlertTriangle size={14} />} />
-                <StatBar label="Drafts" value={stats?.drafts ?? 0} total={stats?.total ?? 1}
+                <StatBar label="Drafts" value={stats.drafts} total={stats.total || 1}
                   color="#64748b" icon={<FileX size={14} />} />
               </div>
             )}
@@ -203,9 +206,9 @@ export function Reports() {
               </div>
             ) : (
               <div className="space-y-1">
-                <FunnelStep label="Sent for Signing" value={sent} total={stats?.total ?? 1} color="#6366f1" />
-                <FunnelStep label="Pending Response" value={stats?.waitingForOthers ?? 0} total={stats?.total ?? 1} color="#f59e0b" />
-                <FunnelStep label="Signed ✓" value={stats?.signed ?? 0} total={stats?.total ?? 1} color="#10b981" isLast />
+                <FunnelStep label="Sent for Signing" value={sent} total={stats.total || 1} color="#6366f1" />
+                <FunnelStep label="Pending Response" value={stats.waitingForOthers} total={stats.total || 1} color="#f59e0b" />
+                <FunnelStep label="Signed ✓" value={stats.signed} total={stats.total || 1} color="#10b981" isLast />
               </div>
             )}
           </div>
